@@ -102,7 +102,7 @@ async function validateRegistration() {
         body: JSON.stringify({ input: { message: `request-${i}` } }),
       });
       const routedVersion = res.headers.get('X-Routed-Version') ?? '(default)';
-      const data = await res.json();
+      const data = (await res.json()) as ExecutionResponse;
       console.log(`  Request ${i}: routed to version=${routedVersion}, result=`, data.result);
     } catch (err) {
       console.error(`  Request ${i}: failed`, err);
