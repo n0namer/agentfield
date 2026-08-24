@@ -150,3 +150,7 @@ func (tx *sqlTx) QueryRowContext(ctx context.Context, query string, args ...inte
 func (tx *sqlTx) QueryRow(query string, args ...interface{}) *sql.Row {
 	return tx.Tx.QueryRow(tx.rebind(query), args...)
 }
+
+func (tx *sqlTx) PrepareContext(ctx context.Context, query string) (*sql.Stmt, error) {
+	return tx.Tx.PrepareContext(ctx, tx.rebind(query))
+}
