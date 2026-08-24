@@ -84,6 +84,88 @@ func (s *DIDService) Initialize(agentfieldServerID string) error {
 
 	}
 
+	if registry != nil {
+		if err := s.repairLoadedAgentDerivationPaths(registry); err != nil {
+			return fmt.Errorf("failed to repair loaded agent DID derivation paths: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// repairLoadedAgentDerivationPaths repairs legacy/corrupted persisted agent derivation paths
+// in memory. Older local-storage persistence normalized every agent path to m/44'/0'/0'/<index>,
+// while DIDService derives agent identities from m/44'/<server-hash>'/<agent-index>'. The DID
+// itself remains authoritative: if the persisted path cannot reproduce it, search bounded agent
+// indexes and restore the path that cryptographically derives the stored DID.
+//
+// This deliberately does not persist the repaired path because the legacy storage contract would
+// normalize it again. A storage-schema migration can replace this compatibility repair later.
+func (s *DIDService) repairLoadedAgentDerivationPaths(registry *types.DIDRegistry) error {
+	if registry == nil || len(registry.AgentNodes) == 0 {
+		return nil
+	}
+	if len(registry.MasterSeed) == 0 {
+		return fmt.Errorf("DID registry master seed is empty")
+	}
+
+	serverHash := s.hashAgentFieldServerID(registry.AgentFieldServerID)
+	searchLimit := len(registry.AgentNodes) + 256
+	if searchLimit < 256 {
+		searchLimit = 256
+	}
+	if searchLimit > 8192 {
+		searchLimit = 8192
+	}
+
+	for nodeID, agentInfo := range registry.AgentNodes {
+		if agentInfo.DID == "" {
+			return fmt.Errorf("agent %s has empty DID", nodeID)
+		}
+
+		if agentInfo.DerivationPath != "" {
+			derivedDID, err := s.generateDIDFromSeed(registry.MasterSeed, agentInfo.DerivationPath)
+			if err != nil {
+				return fmt.Errorf("validate derivation path for agent %s: %w", nodeID, err)
+			}
+			if derivedDID == agentInfo.DID {
+				continue
+			}
+		}
+
+		originalPath := agentInfo.DerivationPath
+		repairedPath := ""
+		for agentIndex := 0; agentIndex < searchLimit; agentIndex++ {
+			candidatePath := fmt.Sprintf("m/44'/%d'/%d'", serverHash, agentIndex)
+			candidateDID, err := s.generateDIDFromSeed(registry.MasterSeed, candidatePath)
+			if err != nil {
+				return fmt.Errorf("derive candidate path for agent %s: %w", nodeID, err)
+			}
+			if candidateDID == agentInfo.DID {
+				repairedPath = candidatePath
+				break
+			}
+		}
+
+		if repairedPath == "" {
+			return fmt.Errorf("unable to recover derivation path for agent %s within %d candidate indexes", nodeID, searchLimit)
+		}
+
+		publicKeyJWK, err := s.regeneratePublicKeyJWK(registry.MasterSeed, repairedPath)
+		if err != nil {
+			return fmt.Errorf("regenerate public key for agent %s: %w", nodeID, err)
+		}
+		agentInfo.DerivationPath = repairedPath
+		agentInfo.PublicKeyJWK = json.RawMessage(publicKeyJWK)
+		registry.AgentNodes[nodeID] = agentInfo
+
+		logger.Logger.Warn().
+			Str("agent_node_id", nodeID).
+			Str("persisted_path", originalPath).
+			Str("repaired_path", repairedPath).
+			Msg("Repaired persisted agent DID derivation path in memory")
+	}
+
 	return nil
 }
 
