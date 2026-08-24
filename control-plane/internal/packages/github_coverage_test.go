@@ -13,25 +13,20 @@ func TestGitHubInstallerErrorCasesFinal(t *testing.T) {
 	t.Parallel()
 
 	// --- updateRegistryWithGitHub errors ---
-	t.Run("updateRegistry-ReadOnly", func(t *testing.T) {
-		home := t.TempDir()
+	t.Run("updateRegistry-InvalidHome", func(t *testing.T) {
+		parent := t.TempDir()
+		home := filepath.Join(parent, "home-file")
+		if err := os.WriteFile(home, []byte("not-a-directory"), 0644); err != nil {
+			t.Fatalf("write home sentinel: %v", err)
+		}
 		gi := &GitHubInstaller{AgentFieldHome: home}
 		info := &GitHubPackageInfo{Owner: "a", Repo: "b", Ref: "c"}
 		metadata := &PackageMetadata{Name: "demo"}
-		registryPath := filepath.Join(home, "installed.yaml")
-
-		if err := os.WriteFile(registryPath, []byte{}, 0644); err != nil {
-			t.Fatalf("write file: %v", err)
-		}
-		if err := os.Chmod(registryPath, 0444); err != nil {
-			t.Fatalf("chmod: %v", err)
-		}
 
 		err := gi.updateRegistryWithGitHub(metadata, info, "", "")
-		if err == nil || !(strings.Contains(err.Error(), "permission denied") || strings.Contains(err.Error(), "read-only file system")) {
-			t.Fatalf("expected permission error, got %v", err)
+		if err == nil || !strings.Contains(err.Error(), "failed to read registry") {
+			t.Fatalf("expected deterministic registry path error, got %v", err)
 		}
-		_ = os.Chmod(registryPath, 0644) // cleanup
 	})
 
 	t.Run("updateRegistry-BadYAML", func(t *testing.T) {
