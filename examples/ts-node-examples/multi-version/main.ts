@@ -83,9 +83,9 @@ async function validateRegistration() {
     console.error(`Failed to list nodes: ${nodesRes.status} ${nodesRes.statusText}`);
     return;
   }
-  const nodesData = await nodesRes.json();
+  const nodesData = (await nodesRes.json()) as NodesResponse;
   const agentNodes = (nodesData.nodes ?? nodesData.agents ?? []).filter(
-    (n: any) => (n.id ?? n.node_id) === AGENT_ID
+    (n) => (n.id ?? n.node_id) === AGENT_ID
   );
   console.log(`[Nodes] Found ${agentNodes.length} versions of "${AGENT_ID}":`);
   for (const n of agentNodes) {
