@@ -100,13 +100,8 @@ func TestGitHubInstallerErrorCasesFinal(t *testing.T) {
 
 	t.Run("findPackageRoot-WalkError", func(t *testing.T) {
 		gi := &GitHubInstaller{}
-		dir := t.TempDir()
-		// Create a file that we can't read to cause filepath.Walk to error
-		unreadable := filepath.Join(dir, "unreadable")
-		if err := os.Mkdir(unreadable, 0000); err != nil {
-			t.Fatalf("mkdir failed: %v", err)
-		}
-		_, err := gi.findPackageRoot(dir)
+		missing := filepath.Join(t.TempDir(), "missing")
+		_, err := gi.findPackageRoot(missing)
 		if err == nil {
 			t.Fatalf("expected error from findPackageRoot, got nil")
 		}
