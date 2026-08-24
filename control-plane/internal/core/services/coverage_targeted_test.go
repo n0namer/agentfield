@@ -669,6 +669,8 @@ func TestAgentServiceRunAgentAdditionalCoverage(t *testing.T) {
 
 		processManager := newMockProcessManager()
 		processManager.startFunc = func(config interfaces.ProcessConfig) (int, error) {
+			require.NoError(t, os.Remove(registryPath))
+			require.NoError(t, os.Mkdir(registryPath, 0o755))
 			return 5151, nil
 		}
 
