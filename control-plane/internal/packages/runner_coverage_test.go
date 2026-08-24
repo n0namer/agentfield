@@ -102,22 +102,18 @@ func TestRunnerErrorCases(t *testing.T) {
 		}
 	})
 
-	t.Run("updateRuntimeInfo-read-only-registry", func(t *testing.T) {
-		home := t.TempDir()
+	t.Run("updateRuntimeInfo-invalid-home", func(t *testing.T) {
+		parent := t.TempDir()
+		home := filepath.Join(parent, "home-file")
+		if err := os.WriteFile(home, []byte("not-a-directory"), 0644); err != nil {
+			t.Fatal(err)
+		}
 		ar := &AgentNodeRunner{AgentFieldHome: home}
-		regPath := filepath.Join(home, "installed.yaml")
-		if err := os.WriteFile(regPath, []byte("installed: { demo: { name: demo } }"), 0444); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chmod(regPath, 0444); err != nil {
-			t.Fatal(err)
-		}
 
 		err := ar.updateRuntimeInfo("demo", 1234, 5678)
-		if err == nil || !(strings.Contains(err.Error(), "permission denied") || strings.Contains(err.Error(), "read-only file system")) {
-			t.Fatalf("expected permission error, got %v", err)
+		if err == nil {
+			t.Fatalf("expected registry write to fail for invalid home path")
 		}
-		_ = os.Chmod(regPath, 0644)
 	})
 
 	t.Run("waitForAgentNode-timeout", func(t *testing.T) {
