@@ -24,6 +24,22 @@ interface VersionSpec {
   port: number;
 }
 
+interface NodeSummary {
+  id?: string;
+  node_id?: string;
+  version?: string;
+  base_url?: string;
+}
+
+interface NodesResponse {
+  nodes?: NodeSummary[];
+  agents?: NodeSummary[];
+}
+
+interface ExecutionResponse {
+  result?: unknown;
+}
+
 const versions: VersionSpec[] = [
   { version: '1.0.0', port: BASE_PORT },
   { version: '2.0.0', port: BASE_PORT + 1 },
