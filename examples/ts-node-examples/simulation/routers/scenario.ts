@@ -62,11 +62,15 @@ RESPONSE FORMAT: Return ONLY valid JSON matching the schema. No prose, no markdo
 
     // Lower temperature for more consistent structured output
     const rawAnalysis = await ctx.ai(prompt, { schema: ScenarioAnalysisSchema, temperature: 0.4 });
-    const analysis =
+    const parsedAnalysis =
       parseWithSchema(rawAnalysis, ScenarioAnalysisSchema, 'Scenario analysis', fallbackAnalysis, true) ??
       fallbackAnalysis();
+    const analysis: ScenarioAnalysis = {
+      ...parsedAnalysis,
+      keyAttributes: parsedAnalysis.keyAttributes ?? []
+    };
 
-    if (!Array.isArray(analysis.keyAttributes) || analysis.keyAttributes.length === 0) {
+    if (analysis.keyAttributes.length === 0) {
       const scenarioText = scenario.toLowerCase();
       if (scenarioText.includes('price') || scenarioText.includes('cost')) {
         analysis.keyAttributes = ['price_sensitivity', 'income', 'budget_constraint', 'perceived_value', 'alternatives'];
