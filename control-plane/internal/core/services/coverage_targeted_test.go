@@ -651,7 +651,7 @@ func TestAgentServiceRunAgentAdditionalCoverage(t *testing.T) {
 		data, err := yaml.Marshal(registry)
 		require.NoError(t, err)
 		registryPath := filepath.Join(home, "installed.yaml")
-		require.NoError(t, os.WriteFile(registryPath, data, 0o444))
+		require.NoError(t, os.WriteFile(registryPath, data, 0o644))
 
 		server, port := startLocalServerOnFreePort(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch r.URL.Path {
