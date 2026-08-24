@@ -33,16 +33,13 @@ func TestInstallerCoverage(t *testing.T) {
 		if err := os.WriteFile(src, []byte{}, 0644); err != nil {
 			t.Fatal(err)
 		}
-		// make dest unwritable
-		destDir := t.TempDir()
-		if err := os.Chmod(destDir, 0555); err != nil {
-			t.Fatal(err)
-		}
-		err := pi.copyFile(src, filepath.Join(destDir, "dest"))
+		// A directory is an invalid file destination on every supported UID,
+		// including root in CI containers.
+		dest := t.TempDir()
+		err := pi.copyFile(src, dest)
 		if err == nil {
 			t.Fatalf("expected file create to fail")
 		}
-		_ = os.Chmod(destDir, 0755)
 	})
 
 	t.Run("installDependencies-python-fails", func(t *testing.T) {
