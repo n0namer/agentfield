@@ -55,14 +55,17 @@ function safeJson(value: string | undefined) {
 // Optional local runner for smoke-testing without heartbeats.
 if (import.meta.url === `file://${process.argv[1]}`) {
   const port = Number(process.env.PORT ?? 8787);
-  const { default: express } = await import('express');
+  const { createServer } = await import('node:http');
 
-  const app = express();
-  app.all('*', async (req, res) => {
-    await handler(req, res);
+  const server = createServer((req, res) => {
+    void Promise.resolve(handler(req, res)).catch((error: unknown) => {
+      console.error('Serverless hello request failed', error);
+      if (!res.headersSent) res.statusCode = 500;
+      if (!res.writableEnded) res.end('Internal Server Error');
+    });
   });
 
-  app.listen(port, '0.0.0.0', () => {
+  server.listen(port, '0.0.0.0', () => {
     console.log(`Serverless hello handler listening on http://localhost:${port}`);
   });
 }
