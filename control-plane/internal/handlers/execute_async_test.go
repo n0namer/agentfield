@@ -22,21 +22,17 @@ import (
 func TestExecuteAsyncHandler_QueueSaturation(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	// Set a small queue capacity for this test
-	// Note: This only works if the pool hasn't been initialized yet
-	// In a real scenario, the pool is initialized once, so this test
-	// verifies the queue saturation logic when the queue is actually full
-	originalCapacity := os.Getenv("AGENTFIELD_EXEC_ASYNC_QUEUE_CAPACITY")
-	defer func() {
-		if originalCapacity != "" {
-			os.Setenv("AGENTFIELD_EXEC_ASYNC_QUEUE_CAPACITY", originalCapacity)
-		} else {
-			os.Unsetenv("AGENTFIELD_EXEC_ASYNC_QUEUE_CAPACITY")
+	prevAsyncPool := asyncPool
+	asyncPool = &asyncWorkerPool{queue: make(chan asyncExecutionJob)}
+	asyncPoolOnce = sync.Once{}
+	asyncPoolOnce.Do(func() {})
+	t.Cleanup(func() {
+		asyncPool = prevAsyncPool
+		asyncPoolOnce = sync.Once{}
+		if prevAsyncPool != nil {
+			asyncPoolOnce.Do(func() {})
 		}
-	}()
-
-	// Set a very small capacity to make saturation easier to test
-	os.Setenv("AGENTFIELD_EXEC_ASYNC_QUEUE_CAPACITY", "2")
+	})
 
 	agent := &types.AgentNode{
 		ID:        "node-1",
@@ -46,34 +42,6 @@ func TestExecuteAsyncHandler_QueueSaturation(t *testing.T) {
 
 	store := newTestExecutionStorage(agent)
 	payloads := services.NewFilePayloadStore(t.TempDir())
-
-	// Get the pool (will be initialized with small capacity)
-	pool := getAsyncWorkerPool()
-
-	// Fill the queue completely - submit more jobs than capacity
-	// Workers will consume some, but we want to ensure queue is full when we make the request
-	queueCapacity := cap(pool.queue)
-
-	// Submit enough jobs to fill the queue (accounting for workers consuming)
-	// We submit more than capacity to ensure queue stays full
-	for i := 0; i < queueCapacity*2; i++ {
-		job := asyncExecutionJob{
-			controller: newExecutionController(store, payloads, nil, 90*time.Second, ""),
-			plan: preparedExecution{
-				exec: &types.Execution{
-					ExecutionID: "test-exec-fill",
-					RunID:       "test-run",
-				},
-			},
-		}
-		if !pool.submit(job) {
-			// Queue is full, good
-			break
-		}
-	}
-
-	// Give a tiny moment for queue state to stabilize
-	time.Sleep(10 * time.Millisecond)
 
 	router := gin.New()
 	router.POST("/api/v1/execute/async/:target", ExecuteAsyncHandler(store, payloads, nil, 90*time.Second, ""))
