@@ -32,6 +32,7 @@ func TestResolve_OneOfGroupStoreReadErrorAborts(t *testing.T) {
 // Contract: when the chosen group option cannot be persisted, Resolve surfaces
 // the save error.
 func TestResolve_OneOfGroupPersistErrorSurfaces(t *testing.T) {
+	skipIfRoot(t)
 	home := t.TempDir()
 	store, err := NewSecretStoreWithProvider(home, fixedProvider{pass: "test-pass-phrase"})
 	if err != nil {
