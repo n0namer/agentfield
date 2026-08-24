@@ -229,6 +229,19 @@ func loadConfig(configFile string) (*config.Config, error) {
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 
+	// ExecutionCleanupConfig tags are documentation only; Viper will otherwise
+	// leave omitted values at their Go zero values and silently disable cleanup.
+	// Set defaults before Unmarshal so explicit config values, including false,
+	// retain precedence.
+	viper.SetDefault("agentfield.execution_cleanup.enabled", true)
+	viper.SetDefault("agentfield.execution_cleanup.retention_period", 24*time.Hour)
+	viper.SetDefault("agentfield.execution_cleanup.cleanup_interval", time.Hour)
+	viper.SetDefault("agentfield.execution_cleanup.batch_size", 100)
+	viper.SetDefault("agentfield.execution_cleanup.preserve_recent_duration", time.Hour)
+	viper.SetDefault("agentfield.execution_cleanup.stale_execution_timeout", 30*time.Minute)
+	viper.SetDefault("agentfield.execution_cleanup.max_retries", 0)
+	viper.SetDefault("agentfield.execution_cleanup.retry_backoff", 30*time.Second)
+
 	// Explicitly bind environment variables for API auth config
 	// This is needed because Viper's AutomaticEnv only works for keys that exist in config
 	_ = viper.BindEnv("api.auth.api_key", "AGENTFIELD_API_KEY")
