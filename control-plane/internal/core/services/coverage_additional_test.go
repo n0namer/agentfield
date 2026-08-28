@@ -69,7 +69,8 @@ func TestAgentServiceBuildProcessConfig(t *testing.T) {
 	require.NoError(t, os.WriteFile(pythonPath, []byte("#!/bin/sh\nexit 0\n"), 0o755))
 
 	logFile := filepath.Join(dir, "agent.log")
-	service := &DefaultAgentService{}
+	agentfieldHome := t.TempDir()
+	service := &DefaultAgentService{agentfieldHome: agentfieldHome}
 	cfg, err := service.buildProcessConfig(packages.InstalledPackage{
 		Name: "agent",
 		Path: dir,
@@ -87,7 +88,7 @@ func TestAgentServiceBuildProcessConfig(t *testing.T) {
 	assert.Contains(t, cfg.Env, "AGENTFIELD_SERVER_URL=http://localhost:8080")
 	assert.Contains(t, cfg.Env, "AGENTFIELD_SERVER=http://localhost:8080")
 	assert.Contains(t, cfg.Env, "VIRTUAL_ENV="+filepath.Join(dir, "venv"))
-	assertEnvWithPrefix(t, cfg.Env, "PATH=", venvBin)
+	assertEnvWithPrefix(t, cfg.Env, "PATH=", venvBin+":"+filepath.Join(agentfieldHome, "bin"))
 	assert.Contains(t, cfg.Env, "PYTHONHOME=")
 	assert.Contains(t, cfg.Env, "PYTHONPATH="+filepath.Join(dir, "venv", "lib"))
 }

@@ -12,8 +12,7 @@ import (
 // RunCommand implements the run command using the new framework
 type RunCommand struct {
 	framework.BaseCommand
-	output      *framework.OutputFormatter
-	callbackURL string
+	output *framework.OutputFormatter
 }
 
 // NewRunCommand creates a new run command
@@ -65,7 +64,6 @@ Examples:
 	}
 
 	cobraCmd.Flags().IntVarP(&port, "port", "p", 0, "Specific port to use (auto-assigned if not specified)")
-	cobraCmd.Flags().StringVar(&cmd.callbackURL, "callback-url", "", "Explicit callback URL advertised by the agent node")
 	cobraCmd.Flags().BoolVarP(&detach, "detach", "d", true, "Run in background (default: true)")
 	cobraCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 	cobraCmd.Flags().BoolVar(&jsonOutput, "json", false, "Emit a machine-readable JSON envelope (diagnostics go to stderr)")
@@ -79,7 +77,7 @@ func (cmd *RunCommand) executeJSON(agentName string, port int, detach bool) erro
 	stdout, restore := redirectStdoutToStderr()
 	defer restore()
 
-	options := domain.RunOptions{Port: port, Detach: detach, CallbackURL: cmd.callbackURL}
+	options := domain.RunOptions{Port: port, Detach: detach}
 	runningAgent, err := cmd.Services.AgentService.RunAgent(agentName, options)
 	if err != nil {
 		printJSONError(stdout, "run_failed", err.Error(), "Run 'af list --json' to check the node is installed and not already running.")
@@ -118,9 +116,8 @@ func (cmd *RunCommand) execute(agentName string, port int, detach, verbose bool)
 
 	// Create run options
 	options := domain.RunOptions{
-		Port:        port,
-		Detach:      detach,
-		CallbackURL: cmd.callbackURL,
+		Port:   port,
+		Detach: detach,
 	}
 
 	// Show progress

@@ -83,9 +83,8 @@ type InstallOptions struct {
 
 // RunOptions represents options for running an agent
 type RunOptions struct {
-	Port        int    `json:"port"`
-	Detach      bool   `json:"detach"`
-	CallbackURL string `json:"callback_url,omitempty"`
+	Port   int  `json:"port"`
+	Detach bool `json:"detach"`
 	// PortIsPreference is reserved for automatic restore/update callers. A busy
 	// preferred port may fall back to another port; a user-requested port must
 	// fail instead of silently starting somewhere else.
