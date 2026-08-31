@@ -15,3 +15,15 @@
 - Agent-node manifests (`agentfield-package.yaml`) carry a `config_version` (schema version, e.g. `v1`; absent = `v0`) that is separate from the node's own `version:`. Bump `config_version` only for breaking format changes, never for additive fields. The single reader is `packages.ParsePackageMetadata` (`control-plane/internal/packages/installer.go`); the authoring contract lives in `docs/installing-agent-nodes.md`.
 - Desktop design/product specs live in `DESIGN.md` and `PRODUCT.md`.
 - Desktop featured-catalog copy is maintained in `desktop/src/shared/catalog.ts`; post-install descriptions come from each agent's `agentfield-package.yaml` (marketplace cards do not fetch YAML live).
+
+## Fast Verified Engineering
+
+Canonical organization standard: `n0namer/server-ops:docs/standards/FAST_VERIFIED_ENGINEERING.md`.
+
+Optimize engineering for **time-to-verified-running-change**. Before material mutation read `ERRORS.md`, resolve project SoT/DoD, observe exact source and runtime identity where relevant, and define rollback plus required evidence.
+
+Keep source, loaded runtime, execution status, deterministic checks and user-visible outcome separate. Prefer permanent DEV runtime-first for defects that depend on real control-plane/node/config/provider state; prefer exact-SHA Coding Station for source-bound or multi-file work; treat GitHub/CI/deploy as the canonical publication/release boundary rather than the default inner debug loop.
+
+Preserve the exact verified delta between lanes. Validate progressively: `syntax/static -> affected tests -> related regression -> full required suite -> runtime smoke/integration -> semantic/E2E` as applicable. Use execution-scoped evidence/logs before broad logs and correlate by node/version/runtime plus execution/request identity.
+
+Production live editing is forbidden by default. Final status is `DONE | PARTIAL | BLOCKED | FAILED | EVIDENCE_MISSING`; DONE requires every task-specific DoD evidence item. Existing AgentField-specific rules in this file remain stricter where applicable.
