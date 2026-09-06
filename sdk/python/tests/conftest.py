@@ -116,6 +116,23 @@ def _isolate_execution_context():
 
 
 @pytest.fixture(autouse=True)
+def _isolate_global_logger_client():
+    """Restore the process-global control-plane logger client after each test.
+
+    Constructing ``Agent`` calls ``set_cp_client(self.client)``. Tests that use a
+    fake client must not leak it into later tests, where structured execution
+    logs may call methods the fake intentionally does not implement.
+    """
+    from agentfield.logger import get_logger, set_cp_client
+
+    previous = get_logger()._cp_client
+    try:
+        yield
+    finally:
+        set_cp_client(previous)
+
+
+@pytest.fixture(autouse=True)
 def _no_network_by_default(request):
     yield
 
