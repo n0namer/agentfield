@@ -36,18 +36,16 @@ Build AgentField as the reliable execution and recovery plane for agents: bounde
 - Fresh `execRun(["go","version"])` reaches the runtime deterministically but exits with `FileNotFoundError`; execution evidence reports `toolchains: []`. Therefore the current blocker is a toolchain provisioning/advertisement mismatch, not an AgentField product failure and not a gateway timeout. Do not install dependencies ad hoc.
 
 ## Current Phase Goal
-Restore a single authoritative Coding Station API route for the existing exact-source workspace, without creating infrastructure. Then prove the smallest deterministic contract-completion loop on exact upstream: observed truth overrides self-report; completed effects are never repeated; unresolved obligations produce the smallest safe continuation; ambiguous mutation state fails closed.
+Prove the smallest deterministic contract-completion loop on exact upstream: observed truth overrides self-report; completed effects are never repeated; unresolved obligations produce the smallest safe continuation; ambiguous mutation state fails closed. Keep the exact-source delta container-first and publish only after deterministic verification.
 
 ## Bounded 30-minute batches
-### Batch A — Coding Station route recovery
+### Batch A — exact-source RED readiness
 DoD:
-- No new service/container.
-- Identify which of the two existing `coding-api` containers is the authoritative one for the current Coolify configuration.
-- Resolve or route around only the stale/duplicate container through its canonical owner. Do not delete/restart both containers blindly.
-- Verify `createRepoSession` +  read  +  `execRun` or managed session on the exact-upstream workspace.
-- Only then proceed to product RED.
-
-Rollback: restore the previous single authoritative route; do not touch workspace data.
+- No new service/container and no ad-hoc toolchain installation.
+- Preserve the now-single authoritative Coding Station route and exact-upstream workspace.
+- Resolve the Go toolchain provisioning/advertisement mismatch through the existing Coding Station owner, or use an already-provisioned canonical test lane only if CURRENT evidence proves exact-source identity.
+- Verify `go version` and one focused existing harness test execute on exact upstream.
+- Only then mutate product source for RED.
 
 ### Batch B — RED + minimal contract-completion slice
 DoD:
