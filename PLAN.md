@@ -58,9 +58,10 @@ DoD:
 - Preserve exact tested delta for SourceLoop/canonical publication when that lane is available.
 
 ## Method / anti-drift
-- BMAD v6.11: use test-design/RED before implementation, `bmad-build` for the minimal vertical slice, and review for verification gaps before closing the batch.
-- Systematic debugging: reproduce/observe before fixing; test one high-information hypothesis at a time; don't stack speculative fixes.
-- TDDD: no product implementation before an observed failing test for the target behavior.
+- BMAD v6.12: research/observe first; use the smallest Build ceremony justified by risk, then one evidence-backed review/verdict pass instead of duplicating equivalent review layers.
+- Systematic debugging skill: reproduce/observe before fixing; test one high-information hypothesis at a time; don't stack speculative fixes.
+- TDD skill: no product implementation before an observed failing test for the target behavior; RED must fail for the intended reason, then minimal GREEN.
+- Verification-before-completion: functional readback/test evidence, not tool acknowledgement or health alone, closes each guarantee.
 - Eval: deterministic correctness first; trajectory/tool-use, repair count, cost and latency secondary.
 - External skills are method input only; no framework installation without a proven gap.
 - Anti-drift invariant: objective remains AgentField upstream reconciliation + generic contract completion + SourceLoop-compatible exact delta. SWE/FCM/OpenCode remains out of scope unless it directly blocks this objective.
