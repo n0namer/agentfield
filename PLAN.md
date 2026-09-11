@@ -67,4 +67,4 @@ DoD:
 - Anti-drift invariant: objective remains AgentField upstream reconciliation + generic contract completion + SourceLoop-compatible exact delta. SWE/FCM/OpenCode remains out of scope unless it directly blocks this objective.
 
 ## Next move
-Resolve the duplicate `coding-api` authority ambiguity using the existing Coolify/Compose owner. This is the smallest high-information fix for the current gateway timeouts. After a single authoritative route is proven, immediately run the deterministic RED contract-completion tests on exact upstream. Do not create infrastructure and do not edit product code on GitHub.
+Resolve the Coding Station Go toolchain provisioning/advertisement mismatch without new infrastructure or ad-hoc installation. Then run one existing harness test as execution proof and immediately add the deterministic RED contract-completion tests on exact upstream. Do not edit AgentField product code on GitHub.
