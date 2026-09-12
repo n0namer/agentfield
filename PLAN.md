@@ -44,8 +44,8 @@ Prove the smallest deterministic contract-completion loop on exact upstream: obs
 DoD:
 - No new service/container and no ad-hoc toolchain installation.
 - Preserve the now-single authoritative Coding Station route and exact-upstream workspace.
-- Resolve the Go toolchain provisioning/advertisement mismatch through the existing Coding Station owner, or use an already-provisioned canonical test lane only if CURRENT evidence proves exact-source identity.
-- Verify `go version` and one focused existing harness test execute on exact upstream.
+- Use Coding Station's existing pinned dynamic-toolchain contract; do not require bare `go` to exist in the image and do not install it ad hoc.
+- After the ambiguous first pinned-toolchain timeout, verify post-state before retry. Then verify `station-toolchain exec go@<pinned> -- go version` and one focused existing harness test execute on exact upstream.
 - Only then mutate product source for RED.
 
 ### Batch B — RED + minimal contract-completion slice
