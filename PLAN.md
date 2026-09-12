@@ -68,4 +68,4 @@ DoD:
 - Anti-drift invariant: objective remains AgentField upstream reconciliation + generic contract completion + SourceLoop-compatible exact delta. SWE/FCM/OpenCode remains out of scope unless it directly blocks this objective.
 
 ## Next move
-Resolve the Coding Station Go toolchain provisioning/advertisement mismatch without new infrastructure or ad-hoc installation. Then run one existing harness test as execution proof and immediately add the deterministic RED contract-completion tests on exact upstream. Do not edit AgentField product code on GitHub.
+Treat the first pinned Go toolchain call as an ambiguous operation: verify Coding Station post-state and cached/toolchain state through the existing owner before retry. Once the pinned lane is proven, run one existing harness test and immediately add deterministic RED contract-completion tests on exact upstream. Do not edit AgentField product code on GitHub.
