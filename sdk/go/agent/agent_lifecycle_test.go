@@ -92,6 +92,43 @@ func TestRegisterNode_TransmitsReasonerDescription(t *testing.T) {
 	assert.Empty(t, byID["run_coder"].Description)
 }
 
+func TestAgentInstanceIDPropagatesAndChangesPerProcess(t *testing.T) {
+	var regs, beats []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var v map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&v))
+		id, _ := v["instance_id"].(string)
+		if r.Method == http.MethodPost {
+			regs = append(regs, id)
+		} else if r.Method == http.MethodPatch {
+			beats = append(beats, id)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"registered","lease_seconds":300,"next_lease_renewal":"2099-01-01T00:00:00Z"}`))
+	}))
+	defer srv.Close()
+	mk := func() *Agent {
+		a, e := New(Config{NodeID: "same-node", Version: "1.0.0", AgentFieldURL: srv.URL, Logger: log.New(io.Discard, "", 0)})
+		require.NoError(t, e)
+		return a
+	}
+	a := mk()
+	require.NoError(t, a.registerNode(context.Background()))
+	require.NoError(t, a.markReady(context.Background()))
+	require.NoError(t, a.registerNode(context.Background())) // reconnect, same process identity
+	b2 := mk()
+	require.NoError(t, b2.registerNode(context.Background()))
+	require.Len(t, regs, 3)
+	require.Len(t, beats, 1)
+	require.Len(t, regs[0], 32)
+	require.Len(t, regs[2], 32)
+	assert.Equal(t, byte('4'), regs[0][12], "instance id must use UUIDv4 version bits")
+	assert.Contains(t, []byte{'8', '9', 'a', 'b'}, regs[0][16], "instance id must use UUID variant bits")
+	assert.Equal(t, regs[0], beats[0])
+	assert.Equal(t, regs[0], regs[1], "same Agent process must keep one instance id across reconnect")
+	assert.NotEqual(t, regs[0], regs[2], "new Agent process needs a fresh instance id")
+}
+
 func TestInitialize_ContinuesWhenDIDOrReadyUpdatesFail(t *testing.T) {
 	agentDID, _ := testDIDCredentials(t)
 	var statusCalls int
@@ -173,6 +210,23 @@ func TestWaitForApproval_CompletesAfterPollAndLogsPollingErrors(t *testing.T) {
 
 	require.NoError(t, a.waitForApproval(context.Background()))
 	assert.GreaterOrEqual(t, polls, 2)
+}
+
+func TestShutdownCancelsInFlightReasoners(t *testing.T) {
+	a, err := New(Config{NodeID: "node-1", Version: "1.0.0", Logger: log.New(io.Discard, "", 0)})
+	require.NoError(t, err)
+	ctx, release := a.registerCancellableExecution(context.Background(), "exec-1")
+	defer release()
+	require.NoError(t, a.shutdown(context.Background()))
+	select {
+	case <-ctx.Done():
+	case <-time.After(time.Second):
+		t.Fatal("shutdown did not cancel in-flight execution")
+	}
+	a.cancelMu.Lock()
+	left := len(a.cancelFuncs)
+	a.cancelMu.Unlock()
+	assert.Zero(t, left)
 }
 
 func TestShutdown_HandlesNilClientAndNilServer(t *testing.T) {

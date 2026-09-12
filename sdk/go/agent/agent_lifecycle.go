@@ -154,12 +154,13 @@ func (a *Agent) registerNode(ctx context.Context) error {
 	}
 
 	payload := types.NodeRegistrationRequest{
-		ID:        a.cfg.NodeID,
-		TeamID:    a.cfg.TeamID,
-		BaseURL:   strings.TrimSuffix(a.cfg.PublicURL, "/"),
-		Version:   a.cfg.Version,
-		Reasoners: reasoners,
-		Skills:    skills,
+		ID:         a.cfg.NodeID,
+		InstanceID: a.instanceID,
+		TeamID:     a.cfg.TeamID,
+		BaseURL:    strings.TrimSuffix(a.cfg.PublicURL, "/"),
+		Version:    a.cfg.Version,
+		Reasoners:  reasoners,
+		Skills:     skills,
 		CommunicationConfig: types.CommunicationConfig{
 			Protocols:         []string{"http"},
 			HeartbeatInterval: a.registeredHeartbeatInterval(),
@@ -268,6 +269,7 @@ func (a *Agent) waitForApproval(ctx context.Context) error {
 func (a *Agent) markReady(ctx context.Context) error {
 	score := 100
 	_, err := a.client.UpdateStatus(ctx, a.cfg.NodeID, types.NodeStatusUpdate{
+		InstanceID:  a.instanceID,
 		Phase:       "ready",
 		Version:     a.cfg.Version,
 		HealthScore: &score,
@@ -340,6 +342,11 @@ func (a *Agent) shutdown(ctx context.Context) error {
 	default:
 		close(a.stopLease)
 	}
+
+	// Stop all in-flight reasoners before the HTTP server begins its bounded
+	// shutdown window. Context-aware subprocesses (for example OpenCode) then
+	// receive cancellation instead of surviving as orphan mutators.
+	a.cancelAllExecutions()
 
 	// Unblock any reasoner still parked in Agent.Pause() so shutdown does not
 	// hang waiting on an approval callback that will never arrive.

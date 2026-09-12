@@ -3,6 +3,7 @@ package agent
 import (
 	"bytes"
 	"context"
+	crand "crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -53,6 +54,16 @@ type ExecutionContext struct {
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
+}
+
+func newAgentInstanceID() (string, error) {
+	b := make([]byte, 16)
+	if _, err := crand.Read(b); err != nil {
+		return "", fmt.Errorf("generate agent instance id: %w", err)
+	}
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%x", b), nil
 }
 
 // HandlerFunc processes a reasoner invocation.
@@ -514,6 +525,7 @@ type CLIConfig struct {
 // Agent manages registration, lease renewal, and HTTP routing.
 type Agent struct {
 	cfg        Config
+	instanceID string
 	client     *client.Client
 	httpClient *http.Client
 
@@ -641,8 +653,14 @@ func New(cfg Config) (*Agent, error) {
 		}
 	}
 
+	instanceID, err := newAgentInstanceID()
+	if err != nil {
+		return nil, err
+	}
+
 	a := &Agent{
 		cfg:                         cfg,
+		instanceID:                  instanceID,
 		httpClient:                  httpClient,
 		callSubmitClient:            callSubmitClient,
 		callPollClient:              callPollClient,

@@ -55,6 +55,7 @@ type CommunicationConfig struct {
 // NodeRegistrationRequest is the legacy-compatible registration payload.
 type NodeRegistrationRequest struct {
 	ID                   string               `json:"id"`
+	InstanceID           string               `json:"instance_id,omitempty"`
 	TeamID               string               `json:"team_id"`
 	BaseURL              string               `json:"base_url"`
 	Version              string               `json:"version"`
@@ -88,6 +89,7 @@ type NodeRegistrationResponse struct {
 
 // NodeStatusUpdate is used for lease renewals.
 type NodeStatusUpdate struct {
+	InstanceID  string `json:"instance_id,omitempty"`
 	Phase       string `json:"phase"`
 	Version     string `json:"version,omitempty"`
 	HealthScore *int   `json:"health_score,omitempty"`
