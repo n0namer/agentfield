@@ -259,6 +259,47 @@ func TestMarkStaleWorkflowExecutions_ReapsWaitingState(t *testing.T) {
 	require.Equal(t, "timeout", record.Status)
 }
 
+func TestMarkStaleWorkflowExecutions_ExecutionActivityProtectsWorkflow(t *testing.T) {
+	ls, ctx := setupTestLocalStorage(t)
+	now := time.Now().UTC()
+	workflow := &types.WorkflowExecution{WorkflowID: "wf-heartbeat", ExecutionID: "exec-heartbeat", AgentFieldRequestID: "req-heartbeat", AgentNodeID: "agent-1", ReasonerID: "reasoner.coder", Status: "running", StartedAt: now.Add(-2*time.Hour), CreatedAt: now.Add(-2*time.Hour), UpdatedAt: now.Add(-time.Hour), WorkflowTags: []string{}, InputData: json.RawMessage("{}"), OutputData: json.RawMessage("{}")}
+	require.NoError(t, ls.StoreWorkflowExecution(ctx, workflow))
+	execution := &types.Execution{ExecutionID: "exec-heartbeat", RunID: "run-heartbeat", AgentNodeID: "agent-1", ReasonerID: "reasoner.coder", NodeID: "node-1", Status: "running", StartedAt: now.Add(-2*time.Hour)}
+	require.NoError(t, ls.CreateExecutionRecord(ctx, execution))
+	backdateExecutionUpdatedAt(t, ls, "executions", execution.ExecutionID, now.Add(-time.Hour))
+	_, err := ls.UpdateExecutionRecord(ctx, execution.ExecutionID, func(current *types.Execution) (*types.Execution, error) {
+		current.Notes = append(current.Notes, types.ExecutionNote{Message: "heartbeat", Timestamp: now})
+		return current, nil
+	})
+	require.NoError(t, err)
+	reaped, err := ls.MarkStaleWorkflowExecutions(ctx, 30*time.Minute, 100)
+	require.NoError(t, err)
+	require.Equal(t, 0, reaped, "recent paired execution activity must protect the workflow row")
+	got, err := ls.GetWorkflowExecution(ctx, workflow.ExecutionID)
+	require.NoError(t, err)
+	require.Equal(t, "running", got.Status)
+}
+
+func TestMarkStaleWorkflowExecutions_ActivityAfterSelectionSkipsUpdate(t *testing.T) {
+	ls, ctx := setupTestLocalStorage(t)
+	now := time.Now().UTC()
+	workflow := &types.WorkflowExecution{WorkflowID: "wf-selection-race", ExecutionID: "exec-selection-race", AgentFieldRequestID: "req-selection-race", AgentNodeID: "agent-1", ReasonerID: "reasoner.coder", Status: "running", StartedAt: now.Add(-2*time.Hour), CreatedAt: now.Add(-2*time.Hour), UpdatedAt: now.Add(-time.Hour), WorkflowTags: []string{}, InputData: json.RawMessage("{}"), OutputData: json.RawMessage("{}")}
+	require.NoError(t, ls.StoreWorkflowExecution(ctx, workflow))
+	execution := &types.Execution{ExecutionID: "exec-selection-race", RunID: "run-selection-race", AgentNodeID: "agent-1", ReasonerID: "reasoner.coder", NodeID: "node-1", Status: "running", StartedAt: now.Add(-2*time.Hour)}
+	require.NoError(t, ls.CreateExecutionRecord(ctx, execution))
+	backdateExecutionUpdatedAt(t, ls, "executions", execution.ExecutionID, now.Add(-time.Hour))
+	var heartbeatErr error
+	reaped, err := ls.markStaleWorkflowExecutions(ctx, 30*time.Minute, 100, func() {
+		_, heartbeatErr = ls.UpdateExecutionRecord(ctx, execution.ExecutionID, func(current *types.Execution) (*types.Execution, error) {
+			current.Notes = append(current.Notes, types.ExecutionNote{Message: "heartbeat", Timestamp: now})
+			return current, nil
+		})
+	})
+	require.NoError(t, heartbeatErr)
+	require.NoError(t, err)
+	require.Equal(t, 0, reaped, "activity after candidate selection must prevent the final timeout update")
+}
+
 func TestMarkStaleWorkflowExecutions_MultipleStuckExecutions(t *testing.T) {
 	ls, ctx := setupTestLocalStorage(t)
 	now := time.Now().UTC()

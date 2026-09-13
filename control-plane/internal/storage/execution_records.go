@@ -33,14 +33,14 @@ func (ls *LocalStorage) CreateExecutionRecord(ctx context.Context, exec *types.E
 	insert := `
 		INSERT INTO executions (
 			execution_id, run_id, parent_execution_id,
-			agent_node_id, reasoner_id, node_id,
+			agent_node_id, instance_id, reasoner_id, node_id,
 			status, status_reason, input_payload, result_payload, error_message,
 			input_uri, result_uri,
 			session_id, actor_id,
 			started_at, completed_at, duration_ms,
 			notes,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	// Serialize notes to JSON
 	var notesJSON []byte
@@ -59,6 +59,7 @@ func (ls *LocalStorage) CreateExecutionRecord(ctx context.Context, exec *types.E
 		exec.RunID,
 		exec.ParentExecutionID,
 		exec.AgentNodeID,
+		exec.InstanceID,
 		exec.ReasonerID,
 		exec.NodeID,
 		exec.Status,
@@ -88,7 +89,7 @@ func (ls *LocalStorage) CreateExecutionRecord(ctx context.Context, exec *types.E
 func (ls *LocalStorage) GetExecutionRecord(ctx context.Context, executionID string) (*types.Execution, error) {
 	query := `
 		SELECT execution_id, run_id, parent_execution_id,
-		       agent_node_id, reasoner_id, node_id,
+		       agent_node_id, COALESCE(instance_id, ''), reasoner_id, node_id,
 		       status, status_reason, input_payload, result_payload, error_message,
 		       input_uri, result_uri,
 		       session_id, actor_id,
@@ -130,7 +131,7 @@ func (ls *LocalStorage) GetExecutionRecordsBatch(ctx context.Context, executionI
 	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(executionIDs)), ",")
 	query := fmt.Sprintf(`
 		SELECT execution_id, run_id, parent_execution_id,
-		       agent_node_id, reasoner_id, node_id,
+		       agent_node_id, COALESCE(instance_id, ''), reasoner_id, node_id,
 		       status, status_reason, input_payload, result_payload, error_message,
 		       input_uri, result_uri,
 		       session_id, actor_id,
@@ -192,7 +193,7 @@ func (ls *LocalStorage) UpdateExecutionRecord(ctx context.Context, executionID s
 	// commits, then re-reads the committed row instead of a stale snapshot.
 	row := tx.QueryRowContext(ctx, `
 		SELECT execution_id, run_id, parent_execution_id,
-		       agent_node_id, reasoner_id, node_id,
+		       agent_node_id, COALESCE(instance_id, ''), reasoner_id, node_id,
 		       status, status_reason, input_payload, result_payload, error_message,
 		       input_uri, result_uri,
 		       session_id, actor_id,
@@ -234,6 +235,7 @@ func (ls *LocalStorage) UpdateExecutionRecord(ctx context.Context, executionID s
 			run_id = ?,
 			parent_execution_id = ?,
 			agent_node_id = ?,
+			instance_id = ?,
 			reasoner_id = ?,
 			node_id = ?,
 			status = ?,
@@ -258,6 +260,7 @@ func (ls *LocalStorage) UpdateExecutionRecord(ctx context.Context, executionID s
 		updated.RunID,
 		updated.ParentExecutionID,
 		updated.AgentNodeID,
+		updated.InstanceID,
 		updated.ReasonerID,
 		updated.NodeID,
 		updated.Status,
@@ -345,7 +348,7 @@ func (ls *LocalStorage) QueryExecutionRecords(ctx context.Context, filter types.
 	}
 	queryBuilder.WriteString(`
 		SELECT execution_id, run_id, parent_execution_id,
-		       agent_node_id, reasoner_id, node_id,
+		       agent_node_id, COALESCE(instance_id, ''), reasoner_id, node_id,
 		       status, status_reason, ` + payloadCols + `, error_message,
 		       input_uri, result_uri,
 		       session_id, actor_id,
@@ -1116,6 +1119,10 @@ func parseTimeString(value string) (time.Time, error) {
 // sweep, and so on up. Nothing is stuck forever; it just takes one sweep per
 // level.
 func (ls *LocalStorage) MarkStaleExecutions(ctx context.Context, staleAfter time.Duration, limit int) (int, error) {
+	return ls.markStaleExecutions(ctx, staleAfter, limit, nil)
+}
+
+func (ls *LocalStorage) markStaleExecutions(ctx context.Context, staleAfter time.Duration, limit int, afterCandidateSelection func()) (int, error) {
 	if limit <= 0 {
 		return 0, nil
 	}
@@ -1164,6 +1171,10 @@ func (ls *LocalStorage) MarkStaleExecutions(ctx context.Context, staleAfter time
 		return 0, nil
 	}
 
+	if afterCandidateSelection != nil {
+		afterCandidateSelection()
+	}
+
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, fmt.Errorf("begin stale execution transaction: %w", err)
@@ -1171,9 +1182,16 @@ func (ls *LocalStorage) MarkStaleExecutions(ctx context.Context, staleAfter time
 	defer rollbackTx(tx, "MarkStaleExecutions")
 
 	updateStmt, err := tx.PrepareContext(ctx, `
-		UPDATE executions
+		UPDATE executions AS e
 		SET status = ?, error_message = ?, completed_at = ?, duration_ms = ?, updated_at = ?
-		WHERE execution_id = ? AND status IN ('running', 'pending', 'queued')`)
+		WHERE e.execution_id = ?
+		  AND e.status IN ('running', 'pending', 'queued')
+		  AND COALESCE(e.updated_at, e.created_at, e.started_at) <= ?
+		  AND NOT EXISTS (
+		      SELECT 1 FROM executions c
+		      WHERE c.parent_execution_id = e.execution_id
+		        AND c.status IN ('running', 'pending', 'queued')
+		  )`)
 	if err != nil {
 		return 0, fmt.Errorf("prepare stale execution update: %w", err)
 	}
@@ -1201,6 +1219,7 @@ func (ls *LocalStorage) MarkStaleExecutions(ctx context.Context, staleAfter time
 			durationMS,
 			now,
 			rec.id,
+			cutoff,
 		)
 		if err != nil {
 			return 0, fmt.Errorf("update stale execution %s: %w", rec.id, err)
@@ -1229,6 +1248,10 @@ func (ls *LocalStorage) MarkStaleExecutions(ctx context.Context, staleAfter time
 // See MarkStaleExecutions for the updated_at invariant, the COALESCE fallback
 // rationale, and why a row with a non-terminal child is skipped rather than reaped.
 func (ls *LocalStorage) MarkStaleWorkflowExecutions(ctx context.Context, staleAfter time.Duration, limit int) (int, error) {
+	return ls.markStaleWorkflowExecutions(ctx, staleAfter, limit, nil)
+}
+
+func (ls *LocalStorage) markStaleWorkflowExecutions(ctx context.Context, staleAfter time.Duration, limit int, afterCandidateSelection func()) (int, error) {
 	if limit <= 0 {
 		return 0, nil
 	}
@@ -1240,18 +1263,22 @@ func (ls *LocalStorage) MarkStaleWorkflowExecutions(ctx context.Context, staleAf
 
 	db := ls.requireSQLDB()
 	rows, err := db.QueryContext(ctx, `
-		SELECT execution_id, started_at
+		SELECT w.execution_id, w.started_at
 		FROM workflow_executions w
-		WHERE status IN ('running', 'pending', 'queued', 'waiting')
-		  AND COALESCE(updated_at, created_at, started_at) <= ?
-		  AND COALESCE(approval_status, '') != 'pending'
+		LEFT JOIN executions e
+		  ON e.execution_id = w.execution_id
+		 AND e.status IN ('running', 'pending', 'queued', 'waiting')
+		WHERE w.status IN ('running', 'pending', 'queued', 'waiting')
+		  AND COALESCE(w.updated_at, w.created_at, w.started_at) <= ?
+		  AND (e.execution_id IS NULL OR COALESCE(e.updated_at, e.created_at, e.started_at) <= ?)
+		  AND COALESCE(w.approval_status, '') != 'pending'
 		  AND NOT EXISTS (
 		      SELECT 1 FROM workflow_executions c
 		      WHERE c.parent_execution_id = w.execution_id
 		        AND c.status IN ('running', 'pending', 'queued', 'waiting')
 		  )
-		ORDER BY COALESCE(updated_at, created_at, started_at) ASC
-		LIMIT ?`, cutoff, limit)
+		ORDER BY COALESCE(w.updated_at, w.created_at, w.started_at) ASC
+		LIMIT ?`, cutoff, cutoff, limit)
 	if err != nil {
 		return 0, fmt.Errorf("query stale workflow executions: %w", err)
 	}
@@ -1278,6 +1305,10 @@ func (ls *LocalStorage) MarkStaleWorkflowExecutions(ctx context.Context, staleAf
 		return 0, nil
 	}
 
+	if afterCandidateSelection != nil {
+		afterCandidateSelection()
+	}
+
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, fmt.Errorf("begin stale workflow execution transaction: %w", err)
@@ -1285,9 +1316,23 @@ func (ls *LocalStorage) MarkStaleWorkflowExecutions(ctx context.Context, staleAf
 	defer rollbackTx(tx, "MarkStaleWorkflowExecutions")
 
 	updateStmt, err := tx.PrepareContext(ctx, `
-		UPDATE workflow_executions
+		UPDATE workflow_executions AS w
 		SET status = ?, error_message = ?, completed_at = ?, duration_ms = ?, updated_at = ?
-		WHERE execution_id = ? AND status IN ('running', 'pending', 'queued', 'waiting')`)
+		WHERE w.execution_id = ?
+		  AND w.status IN ('running', 'pending', 'queued', 'waiting')
+		  AND COALESCE(w.updated_at, w.created_at, w.started_at) <= ?
+		  AND COALESCE(w.approval_status, '') != 'pending'
+		  AND NOT EXISTS (
+		      SELECT 1 FROM workflow_executions c
+		      WHERE c.parent_execution_id = w.execution_id
+		        AND c.status IN ('running', 'pending', 'queued', 'waiting')
+		  )
+		  AND NOT EXISTS (
+		      SELECT 1 FROM executions e
+		      WHERE e.execution_id = w.execution_id
+		        AND e.status IN ('running', 'pending', 'queued', 'waiting')
+		        AND COALESCE(e.updated_at, e.created_at, e.started_at) > ?
+		  )`)
 	if err != nil {
 		return 0, fmt.Errorf("prepare stale workflow execution update: %w", err)
 	}
@@ -1297,7 +1342,9 @@ func (ls *LocalStorage) MarkStaleWorkflowExecutions(ctx context.Context, staleAf
 	syncExecStmt, err := tx.PrepareContext(ctx, `
 		UPDATE executions
 		SET status = ?, error_message = ?, completed_at = ?, duration_ms = ?, updated_at = ?
-		WHERE execution_id = ? AND status IN ('running', 'pending', 'queued', 'waiting')`)
+		WHERE execution_id = ?
+		  AND status IN ('running', 'pending', 'queued', 'waiting')
+		  AND COALESCE(updated_at, created_at, started_at) <= ?`)
 	if err != nil {
 		return 0, fmt.Errorf("prepare stale execution sync update: %w", err)
 	}
@@ -1325,6 +1372,8 @@ func (ls *LocalStorage) MarkStaleWorkflowExecutions(ctx context.Context, staleAf
 			durationMS,
 			now,
 			rec.id,
+			cutoff,
+			cutoff,
 		)
 		if err != nil {
 			return 0, fmt.Errorf("update stale workflow execution %s: %w", rec.id, err)
@@ -1344,6 +1393,7 @@ func (ls *LocalStorage) MarkStaleWorkflowExecutions(ctx context.Context, staleAf
 				durationMS,
 				now,
 				rec.id,
+				cutoff,
 			)
 			updated++
 		}
@@ -1380,6 +1430,16 @@ func (ls *LocalStorage) MarkStaleWorkflowExecutions(ctx context.Context, staleAf
 // not write duration_ms here: the row's started_at is preserved, so consumers
 // that need the runtime can compute completed_at - started_at directly.
 func (ls *LocalStorage) MarkAgentExecutionsOrphaned(ctx context.Context, agentNodeID string, reasonMessage string) (int, error) {
+	return ls.markAgentExecutionsOrphaned(ctx, agentNodeID, "*", reasonMessage)
+}
+
+// MarkAgentInstanceExecutionsOrphaned limits restart cleanup to the departing
+// process plus legacy rows which predate per-execution instance stamping.
+func (ls *LocalStorage) MarkAgentInstanceExecutionsOrphaned(ctx context.Context, agentNodeID, departingInstanceID, reasonMessage string) (int, error) {
+	return ls.markAgentExecutionsOrphaned(ctx, agentNodeID, departingInstanceID, reasonMessage)
+}
+
+func (ls *LocalStorage) markAgentExecutionsOrphaned(ctx context.Context, agentNodeID, departingInstanceID, reasonMessage string) (int, error) {
 	if strings.TrimSpace(agentNodeID) == "" {
 		return 0, fmt.Errorf("agent_node_id is required")
 	}
@@ -1394,9 +1454,10 @@ func (ls *LocalStorage) MarkAgentExecutionsOrphaned(ctx context.Context, agentNo
 		UPDATE workflow_executions
 		SET status = ?, status_reason = ?, error_message = ?, completed_at = ?, updated_at = ?
 		WHERE agent_node_id = ?
+		  AND (? = '*' OR COALESCE(instance_id, '') = '' OR instance_id = ?)
 		  AND status IN ('running', 'pending', 'queued', 'waiting')
 		  AND COALESCE(status_reason, '') <> ?`,
-		types.ExecutionStatusFailed, reasonMessage, reasonMessage, now, now, agentNodeID,
+		types.ExecutionStatusFailed, reasonMessage, reasonMessage, now, now, agentNodeID, departingInstanceID, departingInstanceID,
 		types.ExecutionReasonAwaitingAgentRestart,
 	)
 	if err != nil {
@@ -1404,17 +1465,14 @@ func (ls *LocalStorage) MarkAgentExecutionsOrphaned(ctx context.Context, agentNo
 	}
 	affected, _ := res.RowsAffected()
 
-	// Best-effort sync to the legacy `executions` table. Errors are
-	// intentionally swallowed: workflow_executions is the source of truth,
-	// and the legacy mirror is allowed to lag without blocking restart
-	// recovery.
 	_, _ = db.ExecContext(ctx, `
 		UPDATE executions
 		SET status = ?, status_reason = ?, error_message = ?, completed_at = ?, updated_at = ?
 		WHERE agent_node_id = ?
+		  AND (? = '*' OR COALESCE(instance_id, '') = '' OR instance_id = ?)
 		  AND status IN ('running', 'pending', 'queued', 'waiting')
 		  AND COALESCE(status_reason, '') <> ?`,
-		types.ExecutionStatusFailed, reasonMessage, reasonMessage, now, now, agentNodeID,
+		types.ExecutionStatusFailed, reasonMessage, reasonMessage, now, now, agentNodeID, departingInstanceID, departingInstanceID,
 		types.ExecutionReasonAwaitingAgentRestart,
 	)
 
@@ -1549,6 +1607,7 @@ func scanExecution(scanner interface {
 		&exec.RunID,
 		&parentExecutionID,
 		&exec.AgentNodeID,
+		&exec.InstanceID,
 		&exec.ReasonerID,
 		&exec.NodeID,
 		&exec.Status,

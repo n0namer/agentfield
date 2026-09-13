@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -293,6 +294,19 @@ func TestExecuteHandler_TargetNotFound(t *testing.T) {
 
 func TestExecuteAsyncHandler_ReturnsAccepted(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+
+	concurrencyLimiter = &AgentConcurrencyLimiter{maxPerAgent: 8}
+	concurrencyLimiterOnce = sync.Once{}
+	concurrencyLimiterOnce.Do(func() {})
+	asyncPool = newAsyncWorkerPool(1, 8)
+	asyncPoolOnce = sync.Once{}
+	asyncPoolOnce.Do(func() {})
+	t.Cleanup(func() {
+		concurrencyLimiter = nil
+		concurrencyLimiterOnce = sync.Once{}
+		asyncPool = nil
+		asyncPoolOnce = sync.Once{}
+	})
 
 	var requestCount int32
 	agentServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

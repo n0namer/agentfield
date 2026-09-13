@@ -54,6 +54,76 @@ func seedRunningWorkflowExecution(
 	require.NoError(t, ls.CreateExecutionRecord(t.Context(), exec))
 }
 
+func TestExecutionTablesExposeInstanceIDColumn(t *testing.T) {
+	ls, ctx := setupTestLocalStorage(t)
+	db := ls.requireSQLDB()
+	for _, table := range []string{"executions", "workflow_executions"} {
+		rows, err := db.QueryContext(ctx, "PRAGMA table_info("+table+")")
+		require.NoError(t, err)
+		found := false
+		for rows.Next() {
+			var cid int
+			var name, colType string
+			var notNull int
+			var defaultValue any
+			var pk int
+			require.NoError(t, rows.Scan(&cid, &name, &colType, &notNull, &defaultValue, &pk))
+			if name == "instance_id" {
+				found = true
+			}
+		}
+		require.NoError(t, rows.Close())
+		require.True(t, found, "%s must persist serving instance_id", table)
+	}
+}
+
+func TestMarkAgentInstanceExecutionsOrphaned_ReapsDepartingAndLegacyOnly(t *testing.T) {
+	ls, ctx := setupTestLocalStorage(t)
+	now := time.Now().UTC()
+	seedRunningWorkflowExecution(t, ls, "exec-a", "shared-node", now)
+	seedRunningWorkflowExecution(t, ls, "exec-b", "shared-node", now)
+	seedRunningWorkflowExecution(t, ls, "exec-legacy", "shared-node", now)
+
+	db := ls.requireSQLDB()
+	for _, table := range []string{"executions", "workflow_executions"} {
+		_, err := db.ExecContext(ctx, "UPDATE "+table+" SET instance_id = ? WHERE execution_id = ?", "instance-a", "exec-a")
+		require.NoError(t, err)
+		_, err = db.ExecContext(ctx, "UPDATE "+table+" SET instance_id = ? WHERE execution_id = ?", "instance-b", "exec-b")
+		require.NoError(t, err)
+	}
+
+	reaped, err := ls.MarkAgentInstanceExecutionsOrphaned(ctx, "shared-node", "instance-b", "agent_restart_orphaned: drain elapsed")
+	require.NoError(t, err)
+	require.Equal(t, 2, reaped)
+
+	for id, want := range map[string]string{"exec-a": "running", "exec-b": "failed", "exec-legacy": "failed"} {
+		got, err := ls.GetWorkflowExecution(ctx, id)
+		require.NoError(t, err)
+		require.Equal(t, want, got.Status, id)
+	}
+}
+
+func TestExecutionRecordsPersistServingInstance(t *testing.T) {
+	ls, ctx := setupTestLocalStorage(t)
+	now := time.Now().UTC()
+	exec := &types.Execution{ExecutionID: "exec-stamped", RunID: "run-stamped", AgentNodeID: "node", InstanceID: "instance-current", ReasonerID: "reasoner", NodeID: "node", Status: "running", StartedAt: now}
+	require.NoError(t, ls.CreateExecutionRecord(ctx, exec))
+	wf := &types.WorkflowExecution{WorkflowID: "run-stamped", ExecutionID: "exec-stamped", AgentFieldRequestID: "req-stamped", AgentNodeID: "node", InstanceID: "instance-current", ReasonerID: "reasoner", Status: "running", StartedAt: now, WorkflowTags: []string{}}
+	require.NoError(t, ls.StoreWorkflowExecution(ctx, wf))
+
+	for _, table := range []string{"executions", "workflow_executions"} {
+		var instanceID string
+		require.NoError(t, ls.requireSQLDB().QueryRowContext(ctx, "SELECT COALESCE(instance_id, '') FROM "+table+" WHERE execution_id = ?", "exec-stamped").Scan(&instanceID))
+		require.Equal(t, "instance-current", instanceID, table)
+	}
+	got, err := ls.GetWorkflowExecution(ctx, "exec-stamped")
+	require.NoError(t, err)
+	require.Equal(t, "instance-current", got.InstanceID)
+	gotList, err := ls.QueryWorkflowExecutions(ctx, types.WorkflowExecutionFilters{})
+	require.NoError(t, err)
+	require.Equal(t, "instance-current", gotList[0].InstanceID)
+}
+
 // TestMarkAgentExecutionsOrphaned_ReapsByAgent confirms the core invariant:
 // every non-terminal execution owned by the given agent_node_id is failed,
 // and rows belonging to OTHER agents are untouched. This is the load-bearing

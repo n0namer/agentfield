@@ -17,6 +17,20 @@ import (
 // DefaultLeaseTTL is the lease duration returned to agents when explicit configuration is not yet available.
 const DefaultLeaseTTL = 5 * time.Minute
 
+func rejectStaleAgentInstance(c *gin.Context, incoming string, agent *types.AgentNode) bool {
+	incoming = strings.TrimSpace(incoming)
+	if agent == nil {
+		return false
+	}
+	current := strings.TrimSpace(agent.InstanceID)
+	if current == "" || incoming == current {
+		return false
+	}
+	logger.Logger.Warn().Str("node_id", agent.ID).Msg("rejecting stale agent instance update")
+	c.JSON(http.StatusConflict, gin.H{"error": "stale_agent_instance"})
+	return true
+}
+
 // NodeStatusLeaseHandler processes lease-based status updates from agents.
 func NodeStatusLeaseHandler(storageProvider storage.StorageProvider, statusManager *services.StatusManager, healthMonitor *services.HealthMonitor, presenceManager *services.PresenceManager, leaseTTL time.Duration) gin.HandlerFunc {
 	if leaseTTL <= 0 {
@@ -34,6 +48,7 @@ func NodeStatusLeaseHandler(storageProvider storage.StorageProvider, statusManag
 		var payload struct {
 			Phase       string `json:"phase"`
 			Version     string `json:"version"`
+			InstanceID  string `json:"instance_id,omitempty"`
 			HealthScore *int   `json:"health_score"`
 			// Conditions are accepted for future use but currently ignored by the control plane.
 			Conditions []map[string]interface{} `json:"conditions"`
@@ -53,6 +68,9 @@ func NodeStatusLeaseHandler(storageProvider storage.StorageProvider, statusManag
 		}
 		if err != nil || agent == nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+			return
+		}
+		if rejectStaleAgentInstance(c, payload.InstanceID, agent) {
 			return
 		}
 

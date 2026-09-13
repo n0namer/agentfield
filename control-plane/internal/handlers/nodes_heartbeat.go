@@ -118,6 +118,7 @@ func HeartbeatHandler(storageProvider storage.StorageProvider, uiService *servic
 		// Try to parse enhanced heartbeat data (optional)
 		var enhancedHeartbeat struct {
 			Version     string `json:"version,omitempty"`
+			InstanceID  string `json:"instance_id,omitempty"`
 			Status      string `json:"status,omitempty"`
 			Timestamp   string `json:"timestamp,omitempty"`
 			HealthScore *int   `json:"health_score,omitempty"`
@@ -133,6 +134,26 @@ func HeartbeatHandler(storageProvider storage.StorageProvider, uiService *servic
 			}
 		}
 
+		// Fence ownership against the authoritative serving version. Versioned
+		// agents/canaries are first-class AgentField nodes, so a versioned
+		// heartbeat must resolve that version instead of requiring a default row.
+		// Legacy stored empty instance IDs remain compatible; once the serving
+		// version has a modern instance ID, missing or mismatched owners are stale.
+		var currentNode *types.AgentNode
+		var err error
+		if enhancedHeartbeat.Version != "" {
+			currentNode, err = storageProvider.GetAgentVersion(ctx, nodeID, enhancedHeartbeat.Version)
+		} else {
+			currentNode, err = storageProvider.GetAgent(ctx, nodeID)
+		}
+		if err != nil || currentNode == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+			return
+		}
+		if rejectStaleAgentInstance(c, enhancedHeartbeat.InstanceID, currentNode) {
+			return
+		}
+
 		// Check if database update is needed using caching
 		now := time.Now().UTC()
 		if presenceManager != nil && presenceManager.HasLease(nodeID) {
@@ -144,10 +165,12 @@ func HeartbeatHandler(storageProvider storage.StorageProvider, uiService *servic
 			// Verify node exists only when we need to update DB.
 			// Use the outer-scoped existingNode so it's available for status processing below.
 			var err error
-			if enhancedHeartbeat.Version != "" {
-				existingNode, err = storageProvider.GetAgentVersion(ctx, nodeID, enhancedHeartbeat.Version)
-			} else {
-				existingNode, err = storageProvider.GetAgent(ctx, nodeID)
+			if existingNode == nil {
+				if enhancedHeartbeat.Version != "" {
+					existingNode, err = storageProvider.GetAgentVersion(ctx, nodeID, enhancedHeartbeat.Version)
+				} else {
+					existingNode, err = storageProvider.GetAgent(ctx, nodeID)
+				}
 			}
 			if err != nil {
 				logger.Logger.Error().Err(err).Msgf("❌ Node %s not found during heartbeat update", nodeID)

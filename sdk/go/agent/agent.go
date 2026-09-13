@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -425,6 +426,11 @@ type Config struct {
 	// with the ctx passed to Call instead.
 	CallTimeout time.Duration
 
+	// ShutdownTimeout bounds graceful drain of already-accepted async work.
+	// Default: 30s. After the deadline, tracked work is cancelled and given a
+	// short settlement window to report terminal status.
+	ShutdownTimeout time.Duration
+
 	// DisableLeaseLoop disables automatic periodic lease refreshes.
 	// Optional. Default: false. When true, node registration reports
 	// HeartbeatInterval as "0s" to signal that the agent does not heartbeat.
@@ -584,8 +590,10 @@ type Agent struct {
 	// the matching cancel func to short-circuit the reasoner's context.
 	// Reasoners are responsible for honoring ctx.Done() — most idiomatic
 	// Go code does this through net/http, database/sql, etc.
-	cancelMu    sync.Mutex
-	cancelFuncs map[string]context.CancelFunc
+	cancelMu     sync.Mutex
+	cancelFuncs  map[string]*cancelRegistration
+	executionWG  sync.WaitGroup
+	shuttingDown atomic.Bool
 
 	// pauseManager tracks pending Agent.Pause() calls, keyed by
 	// approval_request_id, and resolves them when the control plane POSTs an
@@ -627,6 +635,9 @@ func New(cfg Config) (*Agent, error) {
 
 	if cfg.CallTimeout <= 0 {
 		cfg.CallTimeout = 15 * time.Second
+	}
+	if cfg.ShutdownTimeout <= 0 {
+		cfg.ShutdownTimeout = 30 * time.Second
 	}
 	httpClient := &http.Client{
 		Timeout: cfg.CallTimeout,
@@ -673,7 +684,7 @@ func New(cfg Config) (*Agent, error) {
 		stopLease:                   make(chan struct{}),
 		logger:                      cfg.Logger,
 		realtimeValidationFunctions: make(map[string]struct{}),
-		cancelFuncs:                 make(map[string]context.CancelFunc),
+		cancelFuncs:                 make(map[string]*cancelRegistration),
 		pauseManager:                NewPauseManager(),
 		startTime:                   time.Now(),
 	}
@@ -1199,9 +1210,20 @@ func (a *Agent) discoveryPayload() map[string]any {
 	}
 }
 
+func (a *Agent) rejectExecutionDuringShutdown(w http.ResponseWriter) bool {
+	if !a.shuttingDown.Load() {
+		return false
+	}
+	http.Error(w, "agent is shutting down", http.StatusServiceUnavailable)
+	return true
+}
+
 func (a *Agent) handleExecute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if a.rejectExecutionDuringShutdown(w) {
 		return
 	}
 
@@ -1244,6 +1266,10 @@ func (a *Agent) handleExecute(w http.ResponseWriter, r *http.Request) {
 	a.fillDIDContext(&execCtx)
 	cancellableCtx, releaseCancel := a.registerCancellableExecution(r.Context(), execCtx.ExecutionID)
 	defer releaseCancel()
+	if a.shuttingDown.Load() && cancellableCtx.Err() != nil {
+		http.Error(w, "agent is shutting down", http.StatusServiceUnavailable)
+		return
+	}
 	ctx := contextWithExecution(cancellableCtx, execCtx)
 	// Fresh per-execution cost tracker: LLM/harness usage recorded during the
 	// reasoner is isolated to this request (concurrent requests each get
@@ -1402,6 +1428,9 @@ func (a *Agent) handleReasoner(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if a.rejectExecutionDuringShutdown(w) {
+		return
+	}
 
 	name := strings.TrimPrefix(r.URL.Path, "/reasoners/")
 	if name == "" {
@@ -1447,16 +1476,28 @@ func (a *Agent) handleReasoner(w http.ResponseWriter, r *http.Request) {
 	// In serverless mode we want a synchronous execution so the control plane can return
 	// the result immediately; skip the async path even if an execution ID is present.
 	if a.cfg.DeploymentType != "serverless" && execCtx.ExecutionID != "" && strings.TrimSpace(a.cfg.AgentFieldURL) != "" {
-		// Async dispatch — handleReasoner returns 202 immediately, the
-		// goroutine owns the lifetime. executeReasonerAsync registers its
-		// own cancellation hook against execution_id, so the cancel
-		// dispatcher can still reach this run.
+		// Reserve the cancellation slot before acknowledging 202. The same
+		// mutex used by shutdown guarantees this request is either registered
+		// before cancel-all or rejected as a late admission.
+		cancellableCtx, releaseCancel := a.registerCancellableExecution(context.Background(), execCtx.ExecutionID)
+		a.cancelMu.Lock()
+		if a.shuttingDown.Load() || cancellableCtx.Err() != nil {
+			a.cancelMu.Unlock()
+			releaseCancel()
+			http.Error(w, "agent is shutting down", http.StatusServiceUnavailable)
+			return
+		}
+		a.executionWG.Add(1)
+		a.cancelMu.Unlock()
 		ctx := contextWithExecution(r.Context(), execCtx)
 		a.logExecutionInfo(ctx, "reasoner.invoke.accepted", "accepted asynchronous execution request", map[string]any{
 			"reasoner_id": name,
 			"mode":        "async",
 		})
-		go a.executeReasonerAsync(reasoner, cloneInputMap(input), execCtx)
+		go func() {
+			defer a.executionWG.Done()
+			a.executeReasonerAsyncRegistered(reasoner, cloneInputMap(input), execCtx, cancellableCtx, releaseCancel)
+		}()
 		writeJSON(w, http.StatusAccepted, map[string]any{
 			"status":        "processing",
 			"execution_id":  execCtx.ExecutionID,
@@ -1472,6 +1513,10 @@ func (a *Agent) handleReasoner(w http.ResponseWriter, r *http.Request) {
 	// that honors ctx.Done().
 	cancellableCtx, releaseCancel := a.registerCancellableExecution(r.Context(), execCtx.ExecutionID)
 	defer releaseCancel()
+	if a.shuttingDown.Load() && cancellableCtx.Err() != nil {
+		http.Error(w, "agent is shutting down", http.StatusServiceUnavailable)
+		return
+	}
 
 	ctx := contextWithExecution(cancellableCtx, execCtx)
 	// Fresh per-execution cost tracker for the sync path; usage recorded by
@@ -1552,6 +1597,9 @@ func (a *Agent) handleSkill(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if a.rejectExecutionDuringShutdown(w) {
+		return
+	}
 
 	name := strings.TrimPrefix(r.URL.Path, "/skills/")
 	if name == "" {
@@ -1577,7 +1625,13 @@ func (a *Agent) handleSkill(w http.ResponseWriter, r *http.Request) {
 
 	execCtx := a.buildExecutionContextFromServerless(r, map[string]any{"input": input}, name)
 	a.fillDIDContext(&execCtx)
-	ctx := contextWithExecution(r.Context(), execCtx)
+	cancellableCtx, releaseCancel := a.registerCancellableExecution(r.Context(), execCtx.ExecutionID)
+	defer releaseCancel()
+	if a.shuttingDown.Load() && cancellableCtx.Err() != nil {
+		http.Error(w, "agent is shutting down", http.StatusServiceUnavailable)
+		return
+	}
+	ctx := contextWithExecution(cancellableCtx, execCtx)
 	// Fresh per-execution cost tracker so concurrent skill invocations are
 	// isolated; usage is attached to the 200 body below.
 	tracker := NewCostTracker()
@@ -1592,10 +1646,15 @@ func (a *Agent) handleSkill(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Agent) executeReasonerAsync(reasoner *Reasoner, input map[string]any, execCtx ExecutionContext) {
-	// Register a cancel hook keyed on execution_id so a control-plane
-	// cancel reaches the still-running reasoner. release fires both on
-	// natural completion (deferred) and on cancel (via ctx.Done()).
 	cancellableCtx, release := a.registerCancellableExecution(context.Background(), execCtx.ExecutionID)
+	if a.shuttingDown.Load() && cancellableCtx.Err() != nil {
+		release()
+		return
+	}
+	a.executeReasonerAsyncRegistered(reasoner, input, execCtx, cancellableCtx, release)
+}
+
+func (a *Agent) executeReasonerAsyncRegistered(reasoner *Reasoner, input map[string]any, execCtx ExecutionContext, cancellableCtx context.Context, release func()) {
 	defer release()
 	ctx := contextWithExecution(cancellableCtx, execCtx)
 	// Fresh per-execution cost tracker: LLM/harness usage recorded while the

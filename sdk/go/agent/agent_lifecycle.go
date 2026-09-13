@@ -343,17 +343,10 @@ func (a *Agent) shutdown(ctx context.Context) error {
 		close(a.stopLease)
 	}
 
-	// Stop all in-flight reasoners before the HTTP server begins its bounded
-	// shutdown window. Context-aware subprocesses (for example OpenCode) then
-	// receive cancellation instead of surviving as orphan mutators.
-	a.cancelAllExecutions()
-
-	// Unblock any reasoner still parked in Agent.Pause() so shutdown does not
-	// hang waiting on an approval callback that will never arrive.
-	if a.pauseManager != nil {
-		a.pauseManager.CancelAll()
-	}
-
+	// Notify the control plane before closing local admission. Requests already
+	// dispatched while that notification is in flight must remain admissible;
+	// otherwise a restart can manufacture a non-retryable 503 before the
+	// control plane has observed the shutdown transition.
 	if a.client != nil {
 		if _, err := a.client.Shutdown(ctx, a.cfg.NodeID, types.ShutdownRequest{Reason: "shutdown", Version: a.cfg.Version}); err != nil {
 			a.logger.Printf("failed to notify shutdown: %v", err)
@@ -362,6 +355,43 @@ func (a *Agent) shutdown(ctx context.Context) error {
 				"error":   err.Error(),
 			})
 		}
+	}
+
+	// Once the control plane has observed shutdown, close admission under the
+	// same mutex used by async acceptance. That makes WaitGroup.Add impossible
+	// after the drain wait begins.
+	a.cancelMu.Lock()
+	a.shuttingDown.Store(true)
+	a.cancelMu.Unlock()
+
+	drained := make(chan struct{})
+	go func() {
+		a.executionWG.Wait()
+		close(drained)
+	}()
+
+	drainTimer := time.NewTimer(a.cfg.ShutdownTimeout)
+	defer drainTimer.Stop()
+	select {
+	case <-drained:
+		// Accepted async work completed naturally; cancel any remaining sync or
+		// direct registrations so they cannot survive process shutdown.
+		a.cancelAllExecutions()
+	case <-drainTimer.C:
+		// Bound graceful drain. Context-aware async work is cancelled and gets a
+		// short settlement window to report terminal status before shutdown moves on.
+		a.cancelAllExecutions()
+		select {
+		case <-drained:
+		case <-time.After(5 * time.Second):
+			a.logger.Printf("shutdown proceeding with async execution(s) still unsettled after cancellation")
+		}
+	}
+
+	// Unblock any reasoner still parked in Agent.Pause() so shutdown does not
+	// hang waiting on an approval callback that will never arrive.
+	if a.pauseManager != nil {
+		a.pauseManager.CancelAll()
 	}
 
 	a.serverMu.RLock()

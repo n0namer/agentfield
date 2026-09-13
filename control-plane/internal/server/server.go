@@ -836,6 +836,14 @@ func (s *AgentFieldServer) Stop() error {
 
 	httpShutdownErr := s.shutdownHTTPServer()
 
+	shutdownTimeout := 30 * time.Second
+	if s.config != nil && s.config.AgentField.ShutdownTimeout > 0 {
+		shutdownTimeout = s.config.AgentField.ShutdownTimeout
+	}
+	poolCtx, cancelPool := context.WithTimeout(context.Background(), shutdownTimeout)
+	handlers.StopAsyncWorkerPool(poolCtx)
+	cancelPool()
+
 	if s.adminGRPCServer != nil {
 		s.adminGRPCServer.GracefulStop()
 	}

@@ -644,6 +644,7 @@ func workflowExecutionDriverRow(executionID, status string, now time.Time) []dri
 		nil,
 		nil,
 		"agent-scripted",
+		"",
 		nil,
 		nil,
 		nil,

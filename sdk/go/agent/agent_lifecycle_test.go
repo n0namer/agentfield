@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -222,6 +223,214 @@ func TestShutdownCancelsInFlightReasoners(t *testing.T) {
 	case <-ctx.Done():
 	case <-time.After(time.Second):
 		t.Fatal("shutdown did not cancel in-flight execution")
+	}
+	a.cancelMu.Lock()
+	left := len(a.cancelFuncs)
+	a.cancelMu.Unlock()
+	assert.Zero(t, left)
+}
+
+func TestShutdownCancelsInFlightSkill(t *testing.T) {
+	a, err := New(Config{NodeID: "node-1", Version: "1.0.0", Logger: log.New(io.Discard, "", 0)})
+	require.NoError(t, err)
+	started := make(chan struct{})
+	a.skills["slow"] = &Reasoner{Name: "slow", Handler: func(ctx context.Context, input map[string]any) (any, error) {
+		close(started)
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/skills/slow", strings.NewReader(`{}`))
+	req.Header.Set("X-Execution-ID", "skill-exec")
+	done := make(chan struct{})
+	go func() { a.handleSkill(rec, req); close(done) }()
+	<-started
+	require.NoError(t, a.shutdown(context.Background()))
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("in-flight skill survived shutdown")
+	}
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
+func TestShutdownWaitsForAcceptedAsyncExecutionTerminalStatus(t *testing.T) {
+	statusPosted := make(chan map[string]any, 1)
+	cp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/api/v1/nodes/node-1/shutdown":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{}`)
+		case r.URL.Path == "/api/v1/executions/exec-drain/status":
+			var payload map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			statusPosted <- payload
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer cp.Close()
+
+	release := make(chan struct{})
+	started := make(chan struct{})
+	a, err := New(Config{
+		NodeID:        "node-1",
+		Version:       "1.0.0",
+		AgentFieldURL: cp.URL,
+		Logger:        log.New(io.Discard, "", 0),
+	})
+	require.NoError(t, err)
+	a.httpClient = cp.Client()
+	a.RegisterReasoner("slow-drain", func(context.Context, map[string]any) (any, error) {
+		close(started)
+		<-release
+		return map[string]any{"ok": true}, nil
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/reasoners/slow-drain", strings.NewReader(`{}`))
+	req.Header.Set("X-Execution-ID", "exec-drain")
+	recorder := httptest.NewRecorder()
+	a.Handler().ServeHTTP(recorder, req)
+	require.Equal(t, http.StatusAccepted, recorder.Code)
+	<-started
+
+	shutdownDone := make(chan error, 1)
+	go func() { shutdownDone <- a.shutdown(context.Background()) }()
+	select {
+	case err := <-shutdownDone:
+		t.Fatalf("shutdown returned before accepted execution completed: %v", err)
+	case <-time.After(30 * time.Millisecond):
+	}
+
+	close(release)
+	require.NoError(t, <-shutdownDone)
+	select {
+	case payload := <-statusPosted:
+		assert.Equal(t, "succeeded", payload["status"])
+	default:
+		t.Fatal("terminal status was not posted before shutdown returned")
+	}
+}
+
+func TestShutdownTimeoutCancelsAcceptedAsyncExecutionAndReportsTerminalStatus(t *testing.T) {
+	statusPosted := make(chan map[string]any, 1)
+	cp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/api/v1/nodes/node-1/shutdown":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{}`)
+		case r.URL.Path == "/api/v1/executions/exec-timeout/status":
+			var payload map[string]any
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			statusPosted <- payload
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer cp.Close()
+
+	started := make(chan struct{})
+	a, err := New(Config{
+		NodeID:          "node-1",
+		Version:         "1.0.0",
+		AgentFieldURL:   cp.URL,
+		ShutdownTimeout: 20 * time.Millisecond,
+		Logger:          log.New(io.Discard, "", 0),
+	})
+	require.NoError(t, err)
+	a.httpClient = cp.Client()
+	a.RegisterReasoner("cancel-aware", func(ctx context.Context, _ map[string]any) (any, error) {
+		close(started)
+		<-ctx.Done()
+		return nil, ctx.Err()
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/reasoners/cancel-aware", strings.NewReader(`{}`))
+	req.Header.Set("X-Execution-ID", "exec-timeout")
+	recorder := httptest.NewRecorder()
+	a.Handler().ServeHTTP(recorder, req)
+	require.Equal(t, http.StatusAccepted, recorder.Code)
+	<-started
+
+	require.NoError(t, a.shutdown(context.Background()))
+	select {
+	case payload := <-statusPosted:
+		assert.Contains(t, []any{"failed", "cancelled"}, payload["status"])
+	default:
+		t.Fatal("terminal status was not posted before shutdown returned")
+	}
+}
+
+func TestShutdownKeepsAdmissionsOpenUntilControlPlaneNotified(t *testing.T) {
+	notifyStarted := make(chan struct{})
+	releaseNotify := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(notifyStarted)
+		<-releaseNotify
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"shutdown"}`))
+	}))
+	defer server.Close()
+
+	a, err := New(Config{
+		NodeID:        "node-1",
+		Version:       "1.0.0",
+		AgentFieldURL: server.URL,
+		Logger:        log.New(io.Discard, "", 0),
+	})
+	require.NoError(t, err)
+
+	shutdownDone := make(chan error, 1)
+	go func() { shutdownDone <- a.shutdown(context.Background()) }()
+	<-notifyStarted
+
+	ctx, release := a.registerCancellableExecution(context.Background(), "during-notify")
+	defer release()
+	prematurelyCancelled := false
+	select {
+	case <-ctx.Done():
+		prematurelyCancelled = true
+	default:
+	}
+
+	close(releaseNotify)
+	require.NoError(t, <-shutdownDone)
+	assert.False(t, prematurelyCancelled, "execution admitted during control-plane shutdown notification was rejected before notify completed")
+	select {
+	case <-ctx.Done():
+	case <-time.After(time.Second):
+		t.Fatal("execution admitted during notify window survived completed shutdown")
+	}
+}
+
+func TestShutdownRejectsNewExecutionAdmissions(t *testing.T) {
+	a, err := New(Config{NodeID: "node-1", Version: "1.0.0", Logger: log.New(io.Discard, "", 0)})
+	require.NoError(t, err)
+	require.NoError(t, a.shutdown(context.Background()))
+
+	for name, tc := range map[string]struct {
+		path    string
+		handler http.HandlerFunc
+	}{
+		"execute":  {path: "/execute/missing", handler: a.handleExecute},
+		"reasoner": {path: "/reasoners/missing", handler: a.handleReasoner},
+		"skill":    {path: "/skills/missing", handler: a.handleSkill},
+	} {
+		t.Run(name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			tc.handler(rec, httptest.NewRequest(http.MethodPost, tc.path, http.NoBody))
+			require.Equal(t, http.StatusServiceUnavailable, rec.Code)
+		})
+	}
+
+	ctx, release := a.registerCancellableExecution(context.Background(), "late-exec")
+	defer release()
+	select {
+	case <-ctx.Done():
+	default:
+		t.Fatal("late registration remained active after shutdown")
 	}
 	a.cancelMu.Lock()
 	left := len(a.cancelFuncs)

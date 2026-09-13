@@ -3,10 +3,12 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -18,6 +20,124 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+func TestExecuteAsyncHandler_ConcurrencyRejectionHasNoPersistence(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	oldLimiter := concurrencyLimiter
+	concurrencyLimiter = &AgentConcurrencyLimiter{maxPerAgent: 1}
+	require.NoError(t, concurrencyLimiter.Acquire("node-1"))
+	defer func() { concurrencyLimiter = oldLimiter }()
+
+	agent := &types.AgentNode{
+		ID:        "node-1",
+		BaseURL:   "http://agent.example",
+		Reasoners: []types.ReasonerDefinition{{ID: "reasoner-a"}},
+	}
+	store := newTestExecutionStorage(agent)
+	payloads := services.NewFilePayloadStore(t.TempDir())
+	router := gin.New()
+	router.POST("/api/v1/execute/async/:target", ExecuteAsyncHandler(store, payloads, nil, time.Second, ""))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/execute/async/node-1.reasoner-a", strings.NewReader(`{"input":{"foo":"bar"}}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	require.Equal(t, http.StatusTooManyRequests, resp.Code)
+	records, err := store.QueryExecutionRecords(context.Background(), types.ExecutionFilter{})
+	require.NoError(t, err)
+	require.Empty(t, records, "rejected async admission must not persist execution rows")
+	workflows, err := store.QueryWorkflowExecutions(context.Background(), types.WorkflowExecutionFilters{})
+	require.NoError(t, err)
+	require.Empty(t, workflows, "rejected async admission must not persist workflow rows")
+}
+
+func TestAsyncWorkerPoolStopFailsAcceptedWorkAndRejectsSubmissions(t *testing.T) {
+	workerStarted := make(chan struct{})
+	releaseWorker := make(chan struct{})
+	agentServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-workerStarted:
+		default:
+			close(workerStarted)
+		}
+		select {
+		case <-r.Context().Done():
+		case <-releaseWorker:
+		}
+	}))
+	defer agentServer.Close()
+
+	agent := &types.AgentNode{ID: "node-1", BaseURL: agentServer.URL}
+	store := newTestExecutionStorage(agent)
+	target, err := parseTarget("node-1.reasoner-a")
+	require.NoError(t, err)
+	pool := newAsyncWorkerPool(1, 2)
+	now := time.Now().UTC()
+	for _, id := range []string{"running-1", "queued-1"} {
+		exec := &types.Execution{
+			ExecutionID: id, RunID: id, NodeID: "node-1", AgentNodeID: "node-1", ReasonerID: "reasoner-a",
+			Status: types.ExecutionStatusRunning, CreatedAt: now, StartedAt: now, UpdatedAt: now,
+		}
+		require.NoError(t, store.CreateExecutionRecord(context.Background(), exec))
+		require.NoError(t, store.StoreWorkflowExecution(context.Background(), &types.WorkflowExecution{
+			ExecutionID: id, WorkflowID: id, RunID: &id, AgentNodeID: "node-1", ReasonerID: "reasoner-a",
+			Status: types.ExecutionStatusRunning, StartedAt: now, CreatedAt: now, UpdatedAt: now,
+		}))
+		require.True(t, pool.submit(asyncExecutionJob{
+			controller: newExecutionController(store, nil, nil, time.Second, ""),
+			plan: preparedExecution{exec: exec, target: target, agent: agent, requestBody: []byte(`{"input":{}}`)},
+		}))
+	}
+	<-workerStarted
+
+	stopCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+	pool.Stop(stopCtx)
+	close(releaseWorker)
+	require.False(t, pool.submit(asyncExecutionJob{}))
+	for _, id := range []string{"running-1", "queued-1"} {
+		stored, getErr := store.GetExecutionRecord(context.Background(), id)
+		require.NoError(t, getErr)
+		require.Equal(t, types.ExecutionStatusFailed, stored.Status, fmt.Sprintf("%s must terminalize on control-plane shutdown", id))
+		workflow, workflowErr := store.GetWorkflowExecution(context.Background(), id)
+		require.NoError(t, workflowErr)
+		require.Equal(t, types.ExecutionStatusFailed, workflow.Status)
+	}
+}
+
+func TestExecuteAsyncHandler_QueueFullHasNoPersistence(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	oldPool, oldOnce := asyncPool, asyncPoolOnce
+	asyncPool = newAsyncWorkerPool(0, 1)
+	require.True(t, asyncPool.reserve())
+	asyncPoolOnce = sync.Once{}
+	asyncPoolOnce.Do(func() {})
+	defer func() { asyncPool, asyncPoolOnce = oldPool, oldOnce }()
+
+	agent := &types.AgentNode{
+		ID:        "node-1",
+		BaseURL:   "http://agent.example",
+		Reasoners: []types.ReasonerDefinition{{ID: "reasoner-a"}},
+	}
+	store := newTestExecutionStorage(agent)
+	payloads := services.NewFilePayloadStore(t.TempDir())
+	router := gin.New()
+	router.POST("/api/v1/execute/async/:target", ExecuteAsyncHandler(store, payloads, nil, time.Second, ""))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/execute/async/node-1.reasoner-a", strings.NewReader(`{"input":{}}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp := httptest.NewRecorder()
+	router.ServeHTTP(resp, req)
+
+	require.Equal(t, http.StatusServiceUnavailable, resp.Code)
+	records, err := store.QueryExecutionRecords(context.Background(), types.ExecutionFilter{})
+	require.NoError(t, err)
+	require.Empty(t, records, "queue-full rejection must not persist execution rows")
+	workflows, err := store.QueryWorkflowExecutions(context.Background(), types.WorkflowExecutionFilters{})
+	require.NoError(t, err)
+	require.Empty(t, workflows, "queue-full rejection must not persist workflow rows")
+}
 
 func TestExecuteAsyncHandler_QueueSaturation(t *testing.T) {
 	gin.SetMode(gin.TestMode)

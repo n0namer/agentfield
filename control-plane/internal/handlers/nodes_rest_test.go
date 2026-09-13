@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -279,6 +280,40 @@ func TestNormalizePhase_AllPhases_ProduceDistinctStates(t *testing.T) {
 // health monitoring — otherwise the monitor never polls it and its
 // health_status never leaves "unknown". Serverless nodes have no /status
 // endpoint to poll and stay out.
+func TestNodeStatusLeaseHandler_RejectsStaleInstance(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	store := &nodeRESTStorageStub{agent: &types.AgentNode{ID: "lease-node", Version: "1.0.0", InstanceID: "instance-new", LifecycleStatus: types.AgentStatusReady}}
+	router := gin.New()
+	router.PATCH("/nodes/:node_id/status", NodeStatusLeaseHandler(store, nil, nil, nil, time.Minute))
+	req := httptest.NewRequest(http.MethodPatch, "/nodes/lease-node/status", strings.NewReader(`{"phase":"ready","instance_id":"instance-old"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusConflict, rec.Code)
+	store.mu.Lock()
+	heartbeats := len(store.heartbeats)
+	store.mu.Unlock()
+	assert.Zero(t, heartbeats, "stale process must not renew current instance lease")
+	assert.Nil(t, store.updatedLifecycle)
+}
+
+func TestNodeStatusLeaseHandler_RejectsMissingInstanceAfterModernRegistration(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	store := &nodeRESTStorageStub{agent: &types.AgentNode{ID: "lease-modern", Version: "1.0.0", InstanceID: "instance-new", LifecycleStatus: types.AgentStatusReady}}
+	router := gin.New()
+	router.PATCH("/nodes/:node_id/status", NodeStatusLeaseHandler(store, nil, nil, nil, time.Minute))
+	req := httptest.NewRequest(http.MethodPatch, "/nodes/lease-modern/status", strings.NewReader(`{"phase":"ready"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusConflict, rec.Code)
+	store.mu.Lock()
+	heartbeats := len(store.heartbeats)
+	store.mu.Unlock()
+	assert.Zero(t, heartbeats)
+	assert.Nil(t, store.updatedLifecycle)
+}
+
 func TestNodeStatusLeaseHandler_RegistersHealthMonitor(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

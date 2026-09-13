@@ -18,7 +18,7 @@ import (
 // memory backends, AI clients, and DID subsystems we don't need here.
 func newCancelAgent() *Agent {
 	return &Agent{
-		cancelFuncs: make(map[string]context.CancelFunc),
+		cancelFuncs: make(map[string]*cancelRegistration),
 	}
 }
 
@@ -222,6 +222,29 @@ func TestRegisterCancellableExecution_ConcurrentReleaseAndCancel(t *testing.T) {
 	a.cancelMu.Unlock()
 	if leftover != 0 {
 		t.Fatalf("leftover cancel registrations = %d, want 0", leftover)
+	}
+}
+
+func TestRegisterCancellableExecution_DuplicateIDKeepsNewestOwner(t *testing.T) {
+	a := newCancelAgent()
+	oldCtx, oldRelease := a.registerCancellableExecution(context.Background(), "exec-dup")
+	newCtx, newRelease := a.registerCancellableExecution(context.Background(), "exec-dup")
+	defer oldRelease()
+	defer newRelease()
+
+	oldRelease()
+	if !a.CancelExecution("exec-dup") {
+		t.Fatal("old release removed the newer cancel registration")
+	}
+	select {
+	case <-newCtx.Done():
+	case <-time.After(time.Second):
+		t.Fatal("new owner was not cancelled")
+	}
+	select {
+	case <-oldCtx.Done():
+	default:
+		t.Fatal("old owner release did not cancel its own context")
 	}
 }
 

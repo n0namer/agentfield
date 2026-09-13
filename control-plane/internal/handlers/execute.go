@@ -166,7 +166,13 @@ type asyncExecutionJob struct {
 }
 
 type asyncWorkerPool struct {
-	queue chan asyncExecutionJob
+	queue         chan asyncExecutionJob
+	reservations  chan struct{}
+	workerCtx     context.Context
+	cancelWorkers context.CancelFunc
+	mu            sync.RWMutex
+	stopped       bool
+	jobs          sync.WaitGroup
 }
 
 type completionJob struct {
@@ -705,7 +711,20 @@ func stringValue(value interface{}) string {
 
 func (c *executionController) handleAsync(ctx *gin.Context) {
 	reqCtx := ctx.Request.Context()
-	plan, err := c.prepareExecution(reqCtx, ctx)
+	pool := getAsyncWorkerPool()
+	if !pool.reserve() {
+		ctx.Header("Retry-After", "1")
+		ctx.JSON(http.StatusServiceUnavailable, gin.H{"error": "async execution queue is full; retry later", "error_category": "concurrency_limit", "retry_after": 1})
+		return
+	}
+	reserved := true
+	defer func() {
+		if reserved {
+			pool.releaseReservation()
+		}
+	}()
+
+	plan, err := c.prepareAsyncExecution(reqCtx, ctx)
 	if err != nil {
 		writeExecutionError(ctx, err)
 		return
@@ -713,6 +732,9 @@ func (c *executionController) handleAsync(ctx *gin.Context) {
 	plan.executionMode = "async"
 
 	if plan.replayHit != nil {
+		pool.releaseReservation()
+		reserved = false
+		ReleaseExecutionSlot(plan.target.NodeID)
 		if err := c.completeReplayHit(reqCtx, plan); err != nil {
 			writeExecutionError(ctx, err)
 			return
@@ -741,38 +763,31 @@ func (c *executionController) handleAsync(ctx *gin.Context) {
 		return
 	}
 
-	// Check LLM health and per-agent concurrency limits before proceeding
-	if err := CheckExecutionPreconditions(plan.target.NodeID, plan.llmEndpoint); err != nil {
-		_ = c.failExecution(reqCtx, plan, err, 0, nil)
-		writeExecutionError(ctx, err)
-		return
-	}
-	// Note: slot is released in asyncExecutionJob.process() after completion
+	// Async admission was acquired before persistence in prepareAsyncExecution.
+	// The slot is released by the worker after completion, or explicitly below
+	// if no worker job is created.
 
 	// Emit execution started event with full reasoner context
 	c.publishExecutionStartedEvent(plan)
 
-	pool := getAsyncWorkerPool()
 	job := asyncExecutionJob{
 		controller: c,
 		plan:       *plan,
 	}
 
-	if ok := pool.submit(job); !ok {
+	if ok := pool.submitReserved(job); !ok {
 		ReleaseExecutionSlot(plan.target.NodeID) // Release since process() won't run
-		queueErr := errors.New("async execution queue is full; retry later")
+		queueErr := errors.New("async execution queue stopped before submission; retry later")
 		if updateErr := c.failExecution(reqCtx, plan, queueErr, 0, nil); updateErr != nil {
 			logger.Logger.Error().
 				Err(updateErr).
 				Str("execution_id", plan.exec.ExecutionID).
-				Msg("failed to persist execution failure after queue saturation")
+				Msg("failed to persist execution failure after reserved submission failure")
 		}
-		logger.Logger.Warn().
-			Str("execution_id", plan.exec.ExecutionID).
-			Msg("async execution rejected due to queue saturation")
 		ctx.JSON(http.StatusServiceUnavailable, gin.H{"error": queueErr.Error(), "error_category": "concurrency_limit"})
 		return
 	}
+	reserved = false
 
 	createdAt := plan.exec.CreatedAt.UTC().Format(time.RFC3339)
 	targetLabel := fmt.Sprintf("%s.%s", plan.target.NodeID, plan.target.TargetName)
@@ -1548,22 +1563,35 @@ type preparedExecution struct {
 }
 
 func (c *executionController) prepareExecution(ctx context.Context, ginCtx *gin.Context) (*preparedExecution, error) {
+	return c.prepareExecutionWithAdmission(ctx, ginCtx, false)
+}
+
+func (c *executionController) prepareAsyncExecution(ctx context.Context, ginCtx *gin.Context) (*preparedExecution, error) {
+	return c.prepareExecutionWithAdmission(ctx, ginCtx, true)
+}
+
+func (c *executionController) prepareExecutionWithAdmission(ctx context.Context, ginCtx *gin.Context, acquireSlot bool) (*preparedExecution, error) {
 	targetParam := ginCtx.Param("target")
 	var req ExecuteRequest
 	if err := ginCtx.ShouldBindJSON(&req); err != nil {
 		return nil, fmt.Errorf("invalid request body: %w", err)
 	}
-	return c.prepareExecutionForTarget(
+	return c.prepareExecutionForTargetWithAdmission(
 		ctx,
 		targetParam,
 		req,
 		readExecutionHeaders(ginCtx),
 		middleware.GetVerifiedCallerDID(ginCtx),
 		middleware.GetTargetDID(ginCtx),
+		acquireSlot,
 	)
 }
 
 func (c *executionController) prepareExecutionForTarget(ctx context.Context, targetParam string, req ExecuteRequest, headers executionHeaders, callerDID, targetDID string) (*preparedExecution, error) {
+	return c.prepareExecutionForTargetWithAdmission(ctx, targetParam, req, headers, callerDID, targetDID, false)
+}
+
+func (c *executionController) prepareExecutionForTargetWithAdmission(ctx context.Context, targetParam string, req ExecuteRequest, headers executionHeaders, callerDID, targetDID string, acquireSlot bool) (_ *preparedExecution, retErr error) {
 	target, err := parseTarget(targetParam)
 	if err != nil {
 		return nil, fmt.Errorf("invalid target: %w", err)
@@ -1657,6 +1685,20 @@ func (c *executionController) prepareExecutionForTarget(ctx context.Context, tar
 	}
 	target.TargetType = targetType
 
+	llmEndpoint := extractRequestedLLMEndpoint(req)
+	slotAcquired := false
+	if acquireSlot {
+		if err := CheckExecutionPreconditions(target.NodeID, llmEndpoint); err != nil {
+			return nil, err
+		}
+		slotAcquired = true
+		defer func() {
+			if retErr != nil && slotAcquired {
+				ReleaseExecutionSlot(target.NodeID)
+			}
+		}()
+	}
+
 	runID := headers.runID
 	if runID == "" {
 		runID = utils.GenerateRunID()
@@ -1682,6 +1724,7 @@ func (c *executionController) prepareExecutionForTarget(ctx context.Context, tar
 		RunID:             runID,
 		ParentExecutionID: headers.parentExecutionID,
 		AgentNodeID:       agent.ID,
+		InstanceID:        agent.InstanceID,
 		ReasonerID:        target.TargetName,
 		NodeID:            target.NodeID,
 		Status:            types.ExecutionStatusRunning,
@@ -1760,7 +1803,7 @@ func (c *executionController) prepareExecutionForTarget(ctx context.Context, tar
 		agent:                   agent,
 		target:                  target,
 		targetType:              targetType,
-		llmEndpoint:             extractRequestedLLMEndpoint(req),
+		llmEndpoint:             llmEndpoint,
 		webhookRegistered:       webhookRegistered,
 		webhookError:            webhookError,
 		callerDID:               callerDID,
@@ -2574,6 +2617,7 @@ func (c *executionController) buildWorkflowExecutionRecord(ctx context.Context, 
 		SessionID:           exec.SessionID,
 		ActorID:             exec.ActorID,
 		AgentNodeID:         exec.AgentNodeID,
+		InstanceID:          exec.InstanceID,
 		ParentWorkflowID:    parentWorkflowID,
 		ParentExecutionID:   exec.ParentExecutionID,
 		RootWorkflowID:      rootWorkflowID,
@@ -2991,15 +3035,18 @@ func (c *executionController) savePayload(ctx context.Context, data []byte) *str
 }
 
 func (j asyncExecutionJob) process() {
-	// Release the per-agent concurrency slot when this job finishes
+	j.processWithContext(context.Background())
+}
+
+func (j asyncExecutionJob) processWithContext(workerCtx context.Context) {
+	// Release the per-agent concurrency slot when this job finishes.
 	if j.plan.target != nil {
 		defer ReleaseExecutionSlot(j.plan.target.NodeID)
 	}
 
-	// Use a bounded context so that paused executions do not block goroutines
-	// indefinitely if the resume/cancel event is never delivered (e.g. event bus
-	// crash, server restart). 24 hours is generous but prevents permanent leaks.
-	bgCtx, cancel := context.WithTimeout(context.Background(), 24*time.Hour)
+	// Use a bounded context so paused work cannot leak forever. Binding it to
+	// the pool worker context lets control-plane shutdown cancel active calls.
+	bgCtx, cancel := context.WithTimeout(workerCtx, 24*time.Hour)
 	defer cancel()
 
 	currentExec, err := j.controller.store.GetExecutionRecord(bgCtx, j.plan.exec.ExecutionID)
@@ -3022,6 +3069,12 @@ func (j asyncExecutionJob) process() {
 	}
 
 	resultBody, elapsed, asyncAccepted, callErr := j.controller.callAgent(bgCtx, &j.plan)
+	if workerCtx.Err() != nil {
+		persistCtx, persistCancel := shutdownPersistenceContext()
+		j.failForControlPlaneShutdown(persistCtx)
+		persistCancel()
+		return
+	}
 	if callErr == nil && asyncAccepted {
 		logger.Logger.Info().
 			Str("execution_id", j.plan.exec.ExecutionID).
@@ -3069,14 +3122,38 @@ func (j asyncExecutionJob) process() {
 }
 
 func newAsyncWorkerPool(workerCount, queueCapacity int) *asyncWorkerPool {
+	admissionCapacity := workerCount + queueCapacity
+	if admissionCapacity <= 0 {
+		admissionCapacity = 1
+	}
+	workerCtx, cancelWorkers := context.WithCancel(context.Background())
 	pool := &asyncWorkerPool{
-		queue: make(chan asyncExecutionJob, queueCapacity),
+		queue:         make(chan asyncExecutionJob, admissionCapacity),
+		reservations:  make(chan struct{}, admissionCapacity),
+		workerCtx:     workerCtx,
+		cancelWorkers: cancelWorkers,
 	}
 
 	for i := 0; i < workerCount; i++ {
 		go func(workerID int) {
 			for job := range pool.queue {
-				job.process()
+				func() {
+					defer pool.releaseReservation()
+					defer pool.jobs.Done()
+					pool.mu.RLock()
+					stopped := pool.stopped
+					pool.mu.RUnlock()
+					if stopped {
+						if job.plan.target != nil {
+							ReleaseExecutionSlot(job.plan.target.NodeID)
+						}
+						persistCtx, cancel := shutdownPersistenceContext()
+						job.failForControlPlaneShutdown(persistCtx)
+						cancel()
+						return
+					}
+					job.processWithContext(pool.workerCtx)
+				}()
 			}
 		}(i)
 	}
@@ -3089,12 +3166,120 @@ func newAsyncWorkerPool(workerCount, queueCapacity int) *asyncWorkerPool {
 	return pool
 }
 
-func (p *asyncWorkerPool) submit(job asyncExecutionJob) bool {
+func (p *asyncWorkerPool) reserve() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if p.stopped {
+		return false
+	}
+	select {
+	case p.reservations <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+func (p *asyncWorkerPool) releaseReservation() {
+	select {
+	case <-p.reservations:
+	default:
+	}
+}
+
+func (p *asyncWorkerPool) submitReserved(job asyncExecutionJob) bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if p.stopped {
+		return false
+	}
+	p.jobs.Add(1)
 	select {
 	case p.queue <- job:
 		return true
 	default:
+		p.jobs.Done()
 		return false
+	}
+}
+
+func (p *asyncWorkerPool) submit(job asyncExecutionJob) bool {
+	if !p.reserve() {
+		return false
+	}
+	if !p.submitReserved(job) {
+		p.releaseReservation()
+		return false
+	}
+	return true
+}
+
+// Stop rejects new submissions, lets accepted work finish until ctx expires,
+// then cancels active workers and terminalizes queued work that never started.
+func (p *asyncWorkerPool) Stop(ctx context.Context) {
+	p.mu.Lock()
+	if !p.stopped {
+		p.stopped = true
+		close(p.queue)
+	}
+	p.mu.Unlock()
+
+	done := make(chan struct{})
+	go func() {
+		p.jobs.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return
+	case <-ctx.Done():
+	}
+
+	p.cancelWorkers()
+	persistCtx, cancel := shutdownPersistenceContext()
+	defer cancel()
+	for job := range p.queue {
+		p.releaseReservation()
+		if job.plan.target != nil {
+			ReleaseExecutionSlot(job.plan.target.NodeID)
+		}
+		job.failForControlPlaneShutdown(persistCtx)
+		p.jobs.Done()
+	}
+	select {
+	case <-done:
+	case <-persistCtx.Done():
+	}
+}
+
+func StopAsyncWorkerPool(ctx context.Context) {
+	if asyncPool != nil {
+		asyncPool.Stop(ctx)
+	}
+}
+
+func shutdownPersistenceContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), 5*time.Second)
+}
+
+func (j asyncExecutionJob) failForControlPlaneShutdown(ctx context.Context) {
+	shutdownErr := &executionPreconditionError{
+		message:  "execution was not completed before the control plane shut down",
+		category: ErrorCategoryControlPlaneShutdown,
+	}
+	if err := j.controller.failExecution(ctx, &j.plan, shutdownErr, 0, nil); err != nil {
+		logger.Logger.Error().Err(err).Str("execution_id", j.plan.exec.ExecutionID).Msg("failed to terminalize execution during control-plane shutdown")
+		return
+	}
+	reason := string(ErrorCategoryControlPlaneShutdown)
+	if err := j.controller.store.UpdateWorkflowExecution(ctx, j.plan.exec.ExecutionID, func(current *types.WorkflowExecution) (*types.WorkflowExecution, error) {
+		if current == nil {
+			return nil, fmt.Errorf("workflow execution %s not found", j.plan.exec.ExecutionID)
+		}
+		current.StatusReason = &reason
+		return current, nil
+	}); err != nil {
+		logger.Logger.Error().Err(err).Str("execution_id", j.plan.exec.ExecutionID).Msg("failed to record shutdown reason on workflow execution")
 	}
 }
 

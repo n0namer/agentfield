@@ -13,6 +13,7 @@ var workflowExecutionLifecycleColumns = []string{
 	"session_id",
 	"actor_id",
 	"agent_node_id",
+	"instance_id",
 	"parent_workflow_id",
 	"parent_execution_id",
 	"root_workflow_id",
@@ -61,7 +62,7 @@ func TestWorkflowExecutionInsertQueriesCoverLifecycleColumns(t *testing.T) {
 		{name: "sqlite", query: sqliteWorkflowExecutionInsertQuery, placeholder: "?"},
 	}
 
-	const expectedPlaceholders = 43
+	const expectedPlaceholders = 44
 
 	for _, tc := range tests {
 		tc := tc

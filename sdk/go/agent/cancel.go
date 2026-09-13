@@ -7,6 +7,10 @@ import (
 	"strings"
 )
 
+type cancelRegistration struct {
+	cancel context.CancelFunc
+}
+
 // registerCancellableExecution wraps `parent` with a child context that the
 // SDK can cancel out-of-band when the control plane's cancel dispatcher
 // fires. Returns the wrapped context and a release function that MUST be
@@ -17,11 +21,18 @@ import (
 func (a *Agent) registerCancellableExecution(parent context.Context, executionID string) (context.Context, func()) {
 	ctx, cancel := context.WithCancel(parent)
 	executionID = strings.TrimSpace(executionID)
-	if executionID != "" {
-		a.cancelMu.Lock()
-		a.cancelFuncs[executionID] = cancel
+	var reg *cancelRegistration
+	a.cancelMu.Lock()
+	if a.shuttingDown.Load() {
 		a.cancelMu.Unlock()
+		cancel()
+		return ctx, func() { cancel() }
 	}
+	if executionID != "" {
+		reg = &cancelRegistration{cancel: cancel}
+		a.cancelFuncs[executionID] = reg
+	}
+	a.cancelMu.Unlock()
 	released := false
 	release := func() {
 		if released {
@@ -32,8 +43,7 @@ func (a *Agent) registerCancellableExecution(parent context.Context, executionID
 			a.cancelMu.Lock()
 			// Only delete our entry — a racing cancel that already
 			// removed it shouldn't get a stale registration overwritten.
-			if existing, ok := a.cancelFuncs[executionID]; ok {
-				_ = existing
+			if existing, ok := a.cancelFuncs[executionID]; ok && existing == reg {
 				delete(a.cancelFuncs, executionID)
 			}
 			a.cancelMu.Unlock()
@@ -51,7 +61,7 @@ func (a *Agent) cancelAllExecutions() int {
 	a.cancelMu.Lock()
 	cancels := make([]context.CancelFunc, 0, len(a.cancelFuncs))
 	for id, cancel := range a.cancelFuncs {
-		cancels = append(cancels, cancel)
+		cancels = append(cancels, cancel.cancel)
 		delete(a.cancelFuncs, id)
 	}
 	a.cancelMu.Unlock()
@@ -67,7 +77,7 @@ func (a *Agent) CancelExecution(executionID string) bool {
 		return false
 	}
 	a.cancelMu.Lock()
-	cancel, ok := a.cancelFuncs[executionID]
+	reg, ok := a.cancelFuncs[executionID]
 	if ok {
 		delete(a.cancelFuncs, executionID)
 	}
@@ -75,7 +85,7 @@ func (a *Agent) CancelExecution(executionID string) bool {
 	if !ok {
 		return false
 	}
-	cancel()
+	reg.cancel()
 	return true
 }
 
