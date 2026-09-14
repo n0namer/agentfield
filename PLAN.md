@@ -55,7 +55,7 @@ DoD:
 - After the ambiguous first pinned-toolchain timeout, verify post-state before retry. Then verify `station-toolchain exec go@<pinned> -- go version` and one focused existing harness test execute on exact upstream.
 - Only then mutate product source for RED.
 
-### Batch B — RED + minimal contract-completion slice
+### Batch B — RED + minimal contract-completion slice — DONE (2026-09-14)
 DoD:
 - Add deterministic failing tests first: runtime validator overrides stale self-report; `SATISFIED` is excluded; `MISSING`/`INVALID` continue; `UNKNOWN` fails closed; an observed mutation is not repeated after an ambiguous transport result.
 - Confirm RED fails for the intended reason before implementation.
