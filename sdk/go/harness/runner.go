@@ -149,9 +149,21 @@ func (r *Runner) Run(ctx context.Context, prompt string, schema map[string]any, 
 
 	startTime := time.Now()
 
-	raw, err := r.executeWithRetry(ctx, provider, effectivePrompt, opts)
-	if err != nil {
-		return nil, err
+	var raw *RawResult
+	if schema != nil {
+		// Schema-constrained runs may mutate durable output before the provider
+		// response reaches us. Do not perform opaque transport retries here:
+		// execute once, then let the schema recovery loop observe persisted
+		// state before deciding whether any continuation is still required.
+		raw, err = provider.Execute(ctx, effectivePrompt, opts)
+		if err != nil {
+			raw = &RawResult{IsError: true, ErrorMessage: err.Error(), FailureType: FailureCrash}
+		}
+	} else {
+		raw, err = r.executeWithRetry(ctx, provider, effectivePrompt, opts)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if schema != nil {
@@ -518,10 +530,9 @@ func (r *Runner) handleSchemaWithRetry(
 			retryOpts.ResumeSessionID = lastSessionID
 		}
 
-		retryRaw, retryErr := r.executeWithRetry(ctx, provider, retryPrompt, retryOpts)
+		retryRaw, retryErr := provider.Execute(ctx, retryPrompt, retryOpts)
 		if retryErr != nil {
-			r.Logger.Printf("Schema retry %d execute error: %v", retryNum+1, retryErr)
-			continue
+			retryRaw = &RawResult{IsError: true, ErrorMessage: retryErr.Error(), FailureType: FailureCrash}
 		}
 		allRaws = append(allRaws, retryRaw)
 
@@ -530,6 +541,29 @@ func (r *Runner) handleSchemaWithRetry(
 		}
 
 		if retryRaw.IsError {
+			// A provider/transport error is not proof that the mutation failed.
+			// Re-observe the durable output before retrying so a completed effect
+			// is never repeated merely because the response was ambiguous.
+			observedData, observedErr := ParseAndValidate(outputPath, dest)
+			if observedErr == nil && observedData != nil {
+				if verr := runSchemaValidation(observedData, schema, dest); verr == nil {
+					elapsed := int(time.Since(startTime).Milliseconds())
+					cost, turns, sid, msgs, tok := accumulateMetrics(allRaws)
+					r.Logger.Printf("Schema retry %d provider errored but persisted postcondition is valid", retryNum+1)
+					res := &Result{
+						Result:     retryRaw.Result,
+						Parsed:     dest,
+						CostUSD:    cost,
+						NumTurns:   turns,
+						DurationMS: elapsed,
+						SessionID:  sid,
+						Model:      firstMetricsModel(allRaws),
+						Messages:   msgs,
+					}
+					tok.applyTo(res)
+					return res
+				}
+			}
 			r.Logger.Printf("Schema retry %d provider error: %s", retryNum+1, retryRaw.ErrorMessage)
 			continue
 		}
