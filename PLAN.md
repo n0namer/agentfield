@@ -94,7 +94,7 @@ DoD:
 - External skills are method input only; no framework installation without a proven gap.
 - Anti-drift invariant: objective is proven generic contract completion on exact AgentField source: runtime truth, preserved partial work, no duplicate mutation, smallest continuation, bounded termination/cost, then E2E + golden regression. Git/fork reconciliation and SourceLoop publication are release mechanics only and must not become the objective or run before those behavioral gates PASS. SWE/FCM/OpenCode remains out of scope unless it directly blocks this objective.
 
-### Batch C — relevant E2E proof — ACTIVE (2026-09-14)
+### Batch C — relevant E2E proof — DONE (2026-09-14)
 DoD:
 - Run the repository's existing end-to-end resilience harness on the exact container workspace before any publication/fork reconciliation.
 - Add or reuse the thinnest end-to-end scenario that exercises schema/contract continuation through the public Runner path, not just helper functions.
