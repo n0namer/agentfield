@@ -8,7 +8,7 @@ Build AgentField as the reliable execution and recovery plane for agents: bounde
 ## Project decisions
 - `PLAN.md` is the project/design SoT for North Star, phase goal, bounded batches, DoD, decisions, drift and next move.
 - Runtime/readback owns actual state; this file must not claim a loaded change without runtime evidence.
-- Code debugging and implementation is container-first. GitHub/CI/deploy is publication/release boundary, not the inner coding loop.
+- Code debugging, implementation, and validation are direct-target/container-first. Do not place Coding Station or any other helper/control-plane proxy in the critical path. GitHub/CI/deploy is publication/release boundary, not the inner coding loop.
 - SourceLoop canonicalizes only an exact delta already verified in DEV.
 - Generic contract completion belongs in AgentField. FCM may select model/provider, but does not decide which obligations are satisfied.
 - Generalize current upstream structured-output recovery (`DiagnoseFieldFailures`, `BuildIncrementalFollowup`, session resume); do not build a second workflow engine.
