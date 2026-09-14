@@ -76,5 +76,20 @@ DoD:
 - External skills are method input only; no framework installation without a proven gap.
 - Anti-drift invariant: objective remains AgentField upstream reconciliation + generic contract completion + SourceLoop-compatible exact delta. SWE/FCM/OpenCode remains out of scope unless it directly blocks this objective.
 
+### Batch C — relevant E2E proof — ACTIVE (2026-09-14)
+DoD:
+- Run the repository's existing end-to-end resilience harness on the exact container workspace before any publication/fork reconciliation.
+- Add or reuse the thinnest end-to-end scenario that exercises schema/contract continuation through the public Runner path, not just helper functions.
+- Prove a durable partial/completed effect is observed after an ambiguous provider/transport result and is not executed twice.
+- Prove unresolved fields continue with the smallest repair while satisfied fields remain preserved.
+- Capture executable evidence: command, exit status, assertions, and relevant artifact/readback.
+
+### Batch D — golden regression — PENDING
+DoD:
+- Freeze representative contract-completion inputs/outputs as deterministic golden fixtures or equivalent repository-native snapshots.
+- Include at minimum: satisfied+missing mix, invalid field, unknown/fail-closed state, ambiguous-result-with-observed-effect, and successful incremental repair.
+- Golden comparison must fail on duplicate mutation, loss of preserved partial output, widened continuation, or changed fail-closed behavior.
+- Re-run affected harness tests + full Go SDK after golden coverage is added.
+
 ## Next move
-Batch A/B are verified complete. The next bounded move is fork reconciliation, not more product coding: preserve the 20 fork-only PLAN/docs commits while bringing the fork's product history onto current upstream `4aa3fe688dfa1f2437ac49f6cbe72aed43ddca07`, then transplant only the already-tested three-file contract-completion delta and re-run the same Go verification on that reconciled base. This changes repository history/product baseline across 88 upstream commits, so do not merge/rebase/reset `main` or redeploy until explicit approval of that larger blast radius. Closed draft PR #7 is evidence of the unsafe direct-publication shape, not a release candidate.
+Do not reconcile the fork, publish product code, merge, or redeploy yet. Batch A/B prove unit/integration behavior only. The immediate bounded move is Batch C: execute existing repository E2E resilience tests and add/reuse the thinnest public-Runner E2E for the new contract-completion behavior. Then complete Batch D golden regression. Fork reconciliation becomes eligible only after both E2E and golden DoD are PASS.
