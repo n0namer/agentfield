@@ -99,4 +99,4 @@ DoD:
 - Re-run affected harness tests + full Go SDK after golden coverage is added.
 
 ## Next move
-Do not reconcile the fork, publish product code, merge, or redeploy yet. Batch A/B prove unit/integration behavior only. The immediate bounded move is Batch C: execute existing repository E2E resilience tests and add/reuse the thinnest public-Runner E2E for the new contract-completion behavior. Then complete Batch D golden regression. Fork reconciliation becomes eligible only after both E2E and golden DoD are PASS.
+Do not reconcile the fork, publish product code, merge, or redeploy yet. Coding Station is removed from the active route. The immediate bounded move is Batch C directly on the authoritative AgentField target/container/runtime: rerun the existing repository E2E resilience harness to exit 0, then add/reuse the thinnest public-Runner E2E for contract completion. Then complete Batch D golden regression. Fork reconciliation becomes eligible only after both E2E and golden DoD are PASS.
