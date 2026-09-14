@@ -47,7 +47,7 @@ Build AgentField as the reliable execution and recovery plane for agents: bounde
 Prove the smallest deterministic contract-completion loop on exact upstream: observed truth overrides self-report; completed effects are never repeated; unresolved obligations produce the smallest safe continuation; ambiguous mutation state fails closed. Keep the exact-source delta container-first and publish only after deterministic verification.
 
 ## Bounded 30-minute batches
-### Batch A — exact-source RED readiness
+### Batch A — exact-source RED readiness — DONE (2026-09-14)
 DoD:
 - No new service/container and no ad-hoc toolchain installation.
 - Preserve the now-single authoritative Coding Station route and exact-upstream workspace.
