@@ -74,7 +74,7 @@ DoD:
 - Verification-before-completion: functional readback/test evidence, not tool acknowledgement or health alone, closes each guarantee.
 - Eval: deterministic correctness first; trajectory/tool-use, repair count, cost and latency secondary.
 - External skills are method input only; no framework installation without a proven gap.
-- Anti-drift invariant: objective remains AgentField upstream reconciliation + generic contract completion + SourceLoop-compatible exact delta. SWE/FCM/OpenCode remains out of scope unless it directly blocks this objective.
+- Anti-drift invariant: objective is proven generic contract completion on exact AgentField source: runtime truth, preserved partial work, no duplicate mutation, smallest continuation, bounded termination/cost, then E2E + golden regression. Git/fork reconciliation and SourceLoop publication are release mechanics only and must not become the objective or run before those behavioral gates PASS. SWE/FCM/OpenCode remains out of scope unless it directly blocks this objective.
 
 ### Batch C — relevant E2E proof — ACTIVE (2026-09-14)
 DoD:
