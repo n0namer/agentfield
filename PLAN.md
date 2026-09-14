@@ -102,7 +102,7 @@ DoD:
 - Prove unresolved fields continue with the smallest repair while satisfied fields remain preserved.
 - Capture executable evidence: command, exit status, assertions, and relevant artifact/readback.
 
-### Batch D — golden regression — PENDING
+### Batch D — golden regression — DONE (2026-09-14)
 DoD:
 - Freeze representative contract-completion inputs/outputs as deterministic golden fixtures or equivalent repository-native snapshots.
 - Include at minimum: satisfied+missing mix, invalid field, unknown/fail-closed state, ambiguous-result-with-observed-effect, and successful incremental repair.
