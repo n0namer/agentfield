@@ -112,7 +112,7 @@ Apply this same contract to every existing project; do not redesign SourceLoop p
 Universal onboarding DoD: canonical owner known; runtime root known; exact base known; binding/captures proven; project validators defined; two durable patches pass capture→exact-base→canonical reread; formal capture→commit linkage exists; active ordered patch stack is reconstructable; upstream owner is known; release snapshot is expressible as an exact commit. Missing any item means PARTIAL/BLOCKED, never GREEN.
 
 ## Current Phase Goal
-Complete native SWE runtime acceptance on the existing AgentField container stack before any publication/release work. Keep all implementation/debugging container-first. The phase is complete only when the штатный `swe-planner` is active/ready, a non-mutating native reasoner smoke succeeds, one bounded `implement_issue` succeeds against the accepted runtime source with canonical tests, and a recovery canary proves the execution can resume/fail safely without duplicate mutation or lost partial work.
+Initial SWE Quality Acceptance is CLOSED on the existing AgentField container stack. Continue container-first operational hardening on the accepted classic `swe-planner` path: keep `swe-planner` active/ready with canonical SDK provenance, preserve the accepted `broker/fast-coding` + OpenCode runtime contract, enforce scope/junk hygiene, and reduce avoidable coder/reviewer/verifier latency without weakening verification. No PR/deploy/redeploy/CI is part of this phase.
 
 ## Bounded 30-minute batches
 ### Batch A — exact-source RED readiness — DONE (2026-09-14)
