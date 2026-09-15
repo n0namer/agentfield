@@ -166,6 +166,18 @@ DoD:
 - Pass one bounded `implement_issue` against the accepted runtime source and its canonical tests. — PASS on nested-Go canary build `a1e63951`; resumed execution `exec_20260915_193318_opt87s9w` ended `succeeded`, outcome `completed`, verification `passed=true`, commit `7f3605cfed7bcd41e2ba2d6a087294d75c8c5253`, exactly one changed file (`go/internal/calc/calc.go`), independent `go test ./...` PASS.
 - Pass a recovery canary proving no duplicate mutation/lost partial state after an interrupted or ambiguous execution. — PASS: observable mutation was preserved across controlled interruption; explicit resume reused the same build `a1e63951`, same issue worktree/branch, produced no duplicate worktree, and completed successfully with one commit.
 
+### Batch F — initial SWE quality acceptance — DONE (2026-09-15)
+DoD:
+- Use the accepted live DEV path only: classic `swe-planner`, `open_code`, `broker/fast-coding`, no PR/deploy/redeploy/CI. — PASS.
+- Reference bounded bug-fix task remains clean PASS from Batch E (`a1e63951`, one expected source file, independent tests PASS).
+- Recovery task remains mandatory PASS: controlled interruption + same-build resume with no duplicate worktree/mutation. — PASS.
+- Test-gap task `exec_20260915_201331_39lhjedj`: terminal `succeeded`, `success=true`, one iteration, exactly one added test file, verifier PASS. — PASS.
+- Cross-file task `exec_20260915_201337_4er7dpxh`: terminal `succeeded`, `success=true`, one iteration, exactly two expected production files, verifier PASS. — PASS.
+- Ambiguous task did not count as clean PASS: initial run `exec_20260915_201345_5pgcia09` ended `failed_unrecoverable` after coder timeout and exposed tracked `.agentfield-out-*`; resumed run `exec_20260915_202821_u3u0hsgx` reached completed/reviewer-approved code but final verification was unavailable while planner registration was stale, and the branch widened scope into `port_test.go`. — FAIL / diagnostic evidence.
+- Initial quality threshold `>=4/5 clean tasks with mandatory recovery PASS` is therefore MET exactly at 4/5. Do not round this to 5/5.
+- Quality-run defect `AgentField structured-output artifacts can be committed` was reproduced RED then fixed GREEN by extending `junkPathspecs`; targeted regression and full `internal/issue` suite PASS. Canonical `swe-af:dev` and live source now equal `0a3f7ef2ecfdc71dd218fad41bbfe28abe1fb3ec`.
+- Planner stale-instance regression caused by a temporary `go.work` reinstall was re-closed using canonical `GOWORK=off + AGENTFIELD_GO_REPLACE`; current `instance_id=28203be8f1884c449c5425862586283e`, health 100, lifecycle `ready`, and the 20:39 heartbeat is active with no fresh 409 after the 20:37 registration.
+
 ## Next move
 Batch E Technical Acceptance is CLOSED. The reference end-to-end proof is nested-Go build `a1e63951`: one intentional mutation, controlled interruption, explicit resume of the same build/worktree/branch, terminal `succeeded`, one commit `7f3605cfed7bcd41e2ba2d6a087294d75c8c5253`, exactly one changed file, verifier PASS, and independent `go test ./...` PASS. Do not rerun this acceptance path unless a later regression requires it.
 
