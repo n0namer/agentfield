@@ -261,10 +261,231 @@ func TestDiagnoseFieldFailures(t *testing.T) {
 	})
 }
 
+func TestPlanContractContinuation_RuntimeEvidenceWins(t *testing.T) {
+	observed := map[string]ObligationObservation{
+		"already_done": {State: ObligationSatisfied, Reason: "validator pass"},
+		"missing":      {State: ObligationMissing, Reason: "missing required field"},
+		"invalid":      {State: ObligationInvalid, Reason: "type mismatch"},
+	}
+	staleSelfReport := map[string]ObligationState{
+		"already_done": ObligationMissing,
+		"missing":      ObligationSatisfied,
+	}
+
+	continuation, err := PlanContractContinuation(observed, staleSelfReport)
+	require.NoError(t, err)
+	assert.NotContains(t, continuation, "already_done", "runtime SATISFIED must override stale self-report")
+	assert.Equal(t, "missing required field", continuation["missing"])
+	assert.Equal(t, "type mismatch", continuation["invalid"])
+
+	_, err = PlanContractContinuation(map[string]ObligationObservation{
+		"unknown": {State: ObligationUnknown, Reason: "validator could not determine postcondition"},
+	}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "UNKNOWN")
+}
+
+func TestPlanContractContinuation_AmbiguousTransportObservedEffectIsNotRepeated(t *testing.T) {
+	continuation, err := PlanContractContinuation(map[string]ObligationObservation{
+		"write_output": {
+			State:              ObligationMissing,
+			Reason:             "stale pre-call state",
+			TransportAmbiguous: true,
+			EffectObserved:     true,
+		},
+	}, map[string]ObligationState{"write_output": ObligationMissing})
+	require.NoError(t, err)
+	assert.NotContains(t, continuation, "write_output", "observed postcondition must suppress duplicate mutation")
+}
+
+func TestHandleSchemaWithRetry_AmbiguousProviderErrorUsesObservedPostcondition(t *testing.T) {
+	dir := t.TempDir()
+	type Out struct {
+		Value string `json:"value"`
+	}
+	schema := map[string]any{
+		"type":       "object",
+		"properties": map[string]any{"value": map[string]any{"type": "string"}},
+		"required":   []any{"value"},
+	}
+	outputPath := OutputPath(dir)
+
+	calls := 0
+	prov := &funcProvider{fn: func(_ context.Context, _ string, _ Options) (*RawResult, error) {
+		calls++
+		if calls > 1 {
+			t.Fatalf("provider mutation repeated after valid postcondition was already observable")
+		}
+		require.NoError(t, os.WriteFile(outputPath, []byte(`{"value":"persisted"}`), 0o644))
+		return &RawResult{
+			IsError:      true,
+			ErrorMessage: "transport closed after mutation",
+			FailureType:  FailureCrash,
+			Metrics:      Metrics{NumTurns: 1},
+		}, nil
+	}}
+
+	var dest Out
+	result := NewRunner(Options{}).handleSchemaWithRetry(
+		context.Background(),
+		&RawResult{Result: "invalid initial output", Metrics: Metrics{NumTurns: 1}},
+		schema, &dest, dir, time.Now(), prov,
+		Options{SchemaMaxRetries: 2}, "ORIGINAL GOAL", true,
+	)
+
+	require.False(t, result.IsError)
+	assert.Equal(t, "persisted", dest.Value)
+	assert.Equal(t, 1, calls)
+}
+
+func TestHandleSchemaWithRetry_ExecuteErrorUsesObservedPostcondition(t *testing.T) {
+	dir := t.TempDir()
+	type Out struct {
+		Value string `json:"value"`
+	}
+	schema := map[string]any{
+		"type":       "object",
+		"properties": map[string]any{"value": map[string]any{"type": "string"}},
+		"required":   []any{"value"},
+	}
+	outputPath := OutputPath(dir)
+
+	calls := 0
+	prov := &funcProvider{fn: func(_ context.Context, _ string, _ Options) (*RawResult, error) {
+		calls++
+		if calls > 1 {
+			t.Fatalf("provider mutation repeated after execute error with valid persisted postcondition")
+		}
+		require.NoError(t, os.WriteFile(outputPath, []byte(`{"value":"persisted"}`), 0o644))
+		return nil, fmt.Errorf("connection reset after mutation")
+	}}
+
+	var dest Out
+	result := NewRunner(Options{}).handleSchemaWithRetry(
+		context.Background(),
+		&RawResult{Result: "invalid initial output", Metrics: Metrics{NumTurns: 1}},
+		schema, &dest, dir, time.Now(), prov,
+		Options{SchemaMaxRetries: 2}, "ORIGINAL GOAL", true,
+	)
+
+	require.False(t, result.IsError)
+	assert.Equal(t, "persisted", dest.Value)
+	assert.Equal(t, 1, calls)
+}
+
 // TestHandleSchemaWithRetry_IncrementalRecovery drives the incremental retry
 // path: an initial partial/invalid output file triggers a patch-only follow-up
 // (with the original goal preserved), and the corrected file assembles a valid
 // dest.
+func TestContractCompletionGoldenSnapshots(t *testing.T) {
+	plannerCases := []struct {
+		name         string
+		observed     map[string]ObligationObservation
+		selfReported map[string]ObligationState
+		wantJSON     string
+		wantErr      string
+	}{
+		{
+			name: "satisfied_plus_missing",
+			observed: map[string]ObligationObservation{
+				"already_done": {State: ObligationSatisfied, Reason: "validator pass"},
+				"missing":      {State: ObligationMissing, Reason: "missing required field"},
+			},
+			selfReported: map[string]ObligationState{
+				"already_done": ObligationMissing,
+				"missing":      ObligationSatisfied,
+			},
+			wantJSON: `{"missing":"missing required field"}`,
+		},
+		{
+			name: "invalid",
+			observed: map[string]ObligationObservation{
+				"invalid": {State: ObligationInvalid, Reason: "type mismatch"},
+			},
+			wantJSON: `{"invalid":"type mismatch"}`,
+		},
+		{
+			name: "unknown_fails_closed",
+			observed: map[string]ObligationObservation{
+				"unknown": {State: ObligationUnknown, Reason: "validator could not determine postcondition"},
+			},
+			wantErr: `obligation "unknown" is UNKNOWN: runtime evidence is insufficient`,
+		},
+		{
+			name: "ambiguous_observed_effect",
+			observed: map[string]ObligationObservation{
+				"write_output": {
+					State:              ObligationMissing,
+					Reason:             "stale pre-call state",
+					TransportAmbiguous: true,
+					EffectObserved:     true,
+				},
+			},
+			wantJSON: `{}`,
+		},
+	}
+
+	for _, tc := range plannerCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := PlanContractContinuation(tc.observed, tc.selfReported)
+			if tc.wantErr != "" {
+				require.EqualError(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			encoded, err := json.Marshal(got)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantJSON, string(encoded))
+		})
+	}
+
+	t.Run("successful_incremental_repair", func(t *testing.T) {
+		dir := t.TempDir()
+		type Out struct {
+			Title string `json:"title"`
+			Body  string `json:"body"`
+		}
+		schema := map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"title": map[string]any{"type": "string"},
+				"body":  map[string]any{"type": "string"},
+			},
+			"required": []any{"title", "body"},
+		}
+		outputPath := OutputPath(dir)
+		require.NoError(t, os.WriteFile(outputPath, []byte(`{"title":"hello","body":123}`), 0o644))
+
+		calls := 0
+		var capturedPrompt string
+		prov := &funcProvider{fn: func(_ context.Context, prompt string, _ Options) (*RawResult, error) {
+			calls++
+			capturedPrompt = prompt
+			require.NoError(t, os.WriteFile(outputPath, []byte(`{"title":"hello","body":"world"}`), 0o644))
+			return &RawResult{Result: "patched", Metrics: Metrics{NumTurns: 1}}, nil
+		}}
+
+		var dest Out
+		result := NewRunner(Options{}).handleSchemaWithRetry(
+			context.Background(),
+			&RawResult{Metrics: Metrics{NumTurns: 1}},
+			schema, &dest, dir, time.Now(), prov,
+			Options{SchemaMaxRetries: 2}, "ORIGINAL GOAL", true,
+		)
+		require.False(t, result.IsError)
+		assert.Contains(t, capturedPrompt, "Patch ONLY these fields")
+
+		snapshot := struct {
+			Calls int    `json:"calls"`
+			Title string `json:"title"`
+			Body  string `json:"body"`
+		}{Calls: calls, Title: dest.Title, Body: dest.Body}
+		encoded, err := json.Marshal(snapshot)
+		require.NoError(t, err)
+		assert.Equal(t, `{"calls":1,"title":"hello","body":"world"}`, string(encoded))
+	})
+}
+
 func TestHandleSchemaWithRetry_IncrementalRecovery(t *testing.T) {
 	dir := t.TempDir()
 	type Out struct {

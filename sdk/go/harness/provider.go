@@ -104,6 +104,11 @@ type Options struct {
 	// validation fails. Default 2.
 	SchemaMaxRetries int
 
+	// schemaOutputDir is runner-owned internal state. Schema-constrained runs
+	// set it to the per-run durable output directory so providers can observe
+	// completion without exposing another public option or guessing from prompts.
+	schemaOutputDir string
+
 	// SchemaMode selects how schema-constrained output is produced:
 	//
 	//	"single" (default, or "") — the agent writes the whole JSON object in

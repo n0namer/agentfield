@@ -54,6 +54,22 @@ func TestIntegration_AgentCRUD_RegisterSameIDUpdates(t *testing.T) {
 	require.Equal(t, "http://updated-host:9999", got.BaseURL)
 }
 
+func TestIntegration_AgentCRUD_ReregisterSameVersionReplacesInstanceID(t *testing.T) {
+	ls, ctx := setupIntegrationStorage(t)
+
+	agent := makeTestAgent("agent-instance", "1.0.0")
+	agent.InstanceID = "alpha"
+	require.NoError(t, ls.RegisterAgent(ctx, agent))
+
+	agent.InstanceID = "beta"
+	require.NoError(t, ls.RegisterAgent(ctx, agent))
+
+	got, err := ls.GetAgentVersion(ctx, "agent-instance", "1.0.0")
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	require.Equal(t, "beta", got.InstanceID, "same-version re-registration must make the new process instance authoritative")
+}
+
 func TestIntegration_AgentCRUD_ListAgents(t *testing.T) {
 	ls, ctx := setupIntegrationStorage(t)
 

@@ -26,7 +26,11 @@ func rejectStaleAgentInstance(c *gin.Context, incoming string, agent *types.Agen
 	if current == "" || incoming == current {
 		return false
 	}
-	logger.Logger.Warn().Str("node_id", agent.ID).Msg("rejecting stale agent instance update")
+	logger.Logger.Warn().
+		Str("node_id", agent.ID).
+		Str("current_instance_id", current).
+		Str("incoming_instance_id", incoming).
+		Msg("rejecting stale agent instance update")
 	c.JSON(http.StatusConflict, gin.H{"error": "stale_agent_instance"})
 	return true
 }

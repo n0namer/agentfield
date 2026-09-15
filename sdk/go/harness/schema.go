@@ -716,6 +716,71 @@ func BuildIncrementalPromptSuffix(jsonSchema map[string]any, dir string) string 
 			"object — no markdown fences, no commentary, no extra text.", outputPath)
 }
 
+// ObligationState is the runtime-observed state of one contract obligation.
+type ObligationState string
+
+const (
+	ObligationSatisfied ObligationState = "SATISFIED"
+	ObligationMissing   ObligationState = "MISSING"
+	ObligationInvalid   ObligationState = "INVALID"
+	ObligationUnknown   ObligationState = "UNKNOWN"
+)
+
+// ObligationObservation carries the authoritative postcondition evidence used
+// to decide whether an obligation needs continuation.
+type ObligationObservation struct {
+	State              ObligationState
+	Reason             string
+	TransportAmbiguous bool
+	EffectObserved     bool
+}
+
+// PlanContractContinuation returns only obligations that still need work.
+// Runtime observations are authoritative; model/self-reported state is used
+// only to detect obligations for which runtime evidence is missing.
+func PlanContractContinuation(observed map[string]ObligationObservation, selfReported map[string]ObligationState) (map[string]string, error) {
+	names := make(map[string]struct{}, len(observed)+len(selfReported))
+	for name := range observed {
+		names[name] = struct{}{}
+	}
+	for name := range selfReported {
+		names[name] = struct{}{}
+	}
+
+	ordered := make([]string, 0, len(names))
+	for name := range names {
+		ordered = append(ordered, name)
+	}
+	sort.Strings(ordered)
+
+	continuation := make(map[string]string)
+	for _, name := range ordered {
+		obs, ok := observed[name]
+		if !ok || obs.State == ObligationUnknown || obs.State == "" {
+			return nil, fmt.Errorf("obligation %q is UNKNOWN: runtime evidence is insufficient", name)
+		}
+
+		if obs.TransportAmbiguous && obs.EffectObserved {
+			continue
+		}
+
+		switch obs.State {
+		case ObligationSatisfied:
+			continue
+		case ObligationMissing, ObligationInvalid:
+			reason := obs.Reason
+			if reason == "" {
+				reason = string(obs.State)
+			}
+			continuation[name] = reason
+		default:
+			return nil, fmt.Errorf("obligation %q has unknown runtime state %q", name, obs.State)
+		}
+	}
+
+	return continuation, nil
+}
+
 // DiagnoseFieldFailures maps each missing/invalid top-level field to a short
 // reason. Returns an empty map when the file validates cleanly. Mirrors the
 // Python _schema.diagnose_field_failures, adapted to the Go dest-struct
