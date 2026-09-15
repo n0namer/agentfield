@@ -157,14 +157,14 @@ DoD:
 - Golden comparison must fail on duplicate mutation, loss of preserved partial output, widened continuation, or changed fail-closed behavior.
 - Re-run affected harness tests + full Go SDK after golden coverage is added.
 
-### Batch E — native SWE runtime acceptance — ACTIVE (2026-09-15)
+### Batch E — native SWE runtime acceptance — DONE (2026-09-15)
 DoD:
-- Work only inside existing AgentField containers/terminals; no PR, CI/CD, deploy or compose recreate while the runtime is not functionally green.
-- Preserve authoritative `/src/swe-af` runtime state and prove the bootstrap path does not discard accepted dirty work.
-- Bring the штатный `swe-planner` to active/ready through the existing AgentField control plane.
-- Pass one non-mutating native reasoner smoke through AgentField discovery/execution.
-- Pass one bounded `implement_issue` against the accepted runtime source and its canonical tests.
-- Pass a recovery canary proving no duplicate mutation/lost partial state after an interrupted or ambiguous execution.
+- Work only inside existing AgentField containers/terminals; no PR, CI/CD, deploy or compose recreate while the runtime is not functionally green. — PASS.
+- Preserve authoritative `/src/swe-af` runtime state and prove the bootstrap path does not discard accepted dirty work. — PASS on `dev@5b54a1dd4c579fd41ddf141e20dd46259519322e`.
+- Bring the штатный `swe-planner` to active/ready through the existing AgentField control plane. — PASS.
+- Pass one non-mutating native reasoner smoke through AgentField discovery/execution. — PASS (`exec_20260915_122235_69og7el9`).
+- Pass one bounded `implement_issue` against the accepted runtime source and its canonical tests. — PASS on nested-Go canary build `a1e63951`; resumed execution `exec_20260915_193318_opt87s9w` ended `succeeded`, outcome `completed`, verification `passed=true`, commit `7f3605cfed7bcd41e2ba2d6a087294d75c8c5253`, exactly one changed file (`go/internal/calc/calc.go`), independent `go test ./...` PASS.
+- Pass a recovery canary proving no duplicate mutation/lost partial state after an interrupted or ambiguous execution. — PASS: observable mutation was preserved across controlled interruption; explicit resume reused the same build `a1e63951`, same issue worktree/branch, produced no duplicate worktree, and completed successfully with one commit.
 
 ## Next move
 SWE upstream + runtime generation cutover is complete. Live `/src/swe-af` now runs exact product base `dev@5b54a1dd4c579fd41ddf141e20dd46259519322e`; new SourceLoop captures are proven against `base_branch=dev` and that exact base, while historical `6f5b438...` captures remain immutable old-generation evidence. Do not reopen upstream reconciliation unless upstream changes again. SourceLoop/SWE returns to normal container-first coding: each new verified delta is a logical patch on the current `dev` generation and integrates back into the single `dev` line after tests/semantic replay. Keep no-PR linkage work separate and do not deploy/redeploy, open PRs, or run CI merely to change metadata.
