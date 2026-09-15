@@ -258,6 +258,12 @@ func InstallGoDependencies(packagePath string, metadata *PackageMetadata) error 
 
 	cmd := exec.Command(goCmd, args...)
 	cmd.Dir = packagePath
+	// Installed package copies are built as standalone modules. Inheriting a
+	// caller GOWORK would put this internal `-mod=mod` build into workspace mode,
+	// which Go rejects before compilation. Keep dev workspaces outside the
+	// installer boundary; local dependency overrides are applied explicitly
+	// above via AGENTFIELD_GO_REPLACE.
+	cmd.Env = append(os.Environ(), "GOWORK=off")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to build Go node (go %s): %w\nOutput: %s", strings.Join(args, " "), err, out)
 	}

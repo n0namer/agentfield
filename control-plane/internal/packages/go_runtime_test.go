@@ -290,6 +290,36 @@ func TestInstallGoDependencies_BuildsBinary(t *testing.T) {
 // status" (the copied package is not a repository, so there is nothing
 // truthful to stamp). Uses the real toolchain: the failure lives inside `go
 // build`'s repository detection, which stubGo cannot reproduce.
+func TestInstallGoDependencies_IgnoresInheritedGoWork(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("real Go toolchain required")
+	}
+	dir := t.TempDir()
+	writeGoManifest(t, dir,
+		"name: n\nversion: 0.1.0\nlanguage: go\nentrypoint:\n  build: ./cmd/node\n  start: bin/node\n",
+		"1.21", "")
+	if err := os.MkdirAll(filepath.Join(dir, "cmd", "node"), 0o755); err != nil {
+		t.Fatalf("mkdir cmd/node: %v", err)
+	}
+	writeFile(t, dir, "cmd/node/main.go", "package main\n\nfunc main() {}\n")
+	workDir := t.TempDir()
+	workFile := filepath.Join(workDir, "go.work")
+	if err := os.WriteFile(workFile, []byte("go 1.21\n\nuse "+dir+"\n"), 0o644); err != nil {
+		t.Fatalf("write go.work: %v", err)
+	}
+	t.Setenv("GOWORK", workFile)
+	md, err := ParsePackageMetadata(dir)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if err := InstallGoDependencies(dir, md); err != nil {
+		t.Fatalf("InstallGoDependencies with inherited GOWORK: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "bin", "node")); err != nil {
+		t.Fatalf("expected built binary bin/node: %v", err)
+	}
+}
+
 func TestInstallGoDependencies_IgnoresParentVCS(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("real Go toolchain required")

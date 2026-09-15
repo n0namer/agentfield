@@ -411,6 +411,42 @@ func TestAforgeProviderConcurrencyLimit(t *testing.T) {
 	assert.LessOrEqual(t, maxSeen, int64(2))
 }
 
+func TestAforgeRunnerAmbiguousExitUsesPersistedPostconditionWithoutRepeat(t *testing.T) {
+	useAforgeDo(t)
+	cwd := t.TempDir()
+	marker := filepath.Join(cwd, "calls")
+	script := writeTestScript(t, cwd, "aforge-ambiguous", `#!/bin/sh
+marker="$(dirname "$0")/calls"
+printf 'x\n' >> "$marker"
+prompt=$(cat)
+output_path=$(printf '%s' "$prompt" | tr '\n' ' ' | sed -n 's/.*create this file: \([^ ]*\.agentfield_output\.json\).*/\1/p')
+mkdir -p "$(dirname "$output_path")"
+printf '%s' '{"value":"persisted"}' > "$output_path"
+exit 1
+`)
+
+	type output struct {
+		Value string `json:"value"`
+	}
+	schema := map[string]any{
+		"type":       "object",
+		"properties": map[string]any{"value": map[string]any{"type": "string"}},
+		"required":   []any{"value"},
+	}
+	runner := NewRunner(Options{Provider: ProviderAforge, BinPath: script})
+
+	var dest output
+	result, err := runner.Run(context.Background(), "write the result", schema, &dest, Options{Cwd: cwd, SchemaMaxRetries: 2})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.False(t, result.IsError, result.ErrorMessage)
+	assert.Equal(t, "persisted", dest.Value)
+
+	calls, err := os.ReadFile(marker)
+	require.NoError(t, err)
+	assert.Equal(t, "x\n", string(calls), "ambiguous provider exit must not repeat a completed mutation")
+}
+
 func TestAforgeRunnerConcurrentSameCwdUsesIsolatedSchemaFiles(t *testing.T) {
 	useAforgeDo(t)
 	cwd := t.TempDir()
