@@ -90,7 +90,7 @@ DoD:
 - Preserve exact tested delta for SourceLoop/canonical publication when that lane is available.
 
 ## Method / anti-drift
-- BMAD v6.12: research/observe first; use the smallest Build ceremony justified by risk, then one evidence-backed review/verdict pass instead of duplicating equivalent review layers.
+- BMAD current contract: `bmad-build` is the implementation loop (`bmad-quick-dev` is a compatibility shim). For this debugging/implementation phase use its lean shape only: observe/reproduce → isolate root cause → smallest scoped change → canonical validation → evidence-backed review. Do not add ceremony that does not improve a gate.
 - Systematic debugging skill: reproduce/observe before fixing; test one high-information hypothesis at a time; don't stack speculative fixes.
 - TDD skill: no product implementation before an observed failing test for the target behavior; RED must fail for the intended reason, then minimal GREEN.
 - Verification-before-completion: functional readback/test evidence, not tool acknowledgement or health alone, closes each guarantee.
