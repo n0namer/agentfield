@@ -3,6 +3,7 @@ package packages
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -224,6 +225,13 @@ func InstallGoDependencies(packagePath string, metadata *PackageMetadata) error 
 	if err := applyGoReplaceOverrides(goCmd, packagePath); err != nil {
 		return err
 	}
+	// Preserve local dependency overlays from an inherited go.work before the
+	// installed package is built as a standalone module. This keeps container
+	// dev workspaces (for example a local AgentField SDK) authoritative without
+	// forcing the copied package itself to remain in workspace mode.
+	if err := applyGoWorkspaceOverrides(goCmd, packagePath); err != nil {
+		return err
+	}
 
 	buildPkg, outBin := metadata.goBuildTarget()
 
@@ -434,6 +442,74 @@ func applyGoReplaceOverrides(goCmd, packagePath string) error {
 		cmd.Dir = packagePath
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("failed to apply Go replace override %q: %w\nOutput: %s", entry, err, out)
+		}
+	}
+	return nil
+}
+
+func readGoModulePath(packagePath string) string {
+	f, err := os.Open(filepath.Join(packagePath, "go.mod"))
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		line := strings.TrimSpace(s.Text())
+		if strings.HasPrefix(line, "module ") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "module "))
+		}
+	}
+	return ""
+}
+
+// applyGoWorkspaceOverrides snapshots dependency modules from an inherited
+// workspace into explicit go.mod replace directives. The installed package can
+// then build with GOWORK=off while preserving the exact local dependencies the
+// caller intentionally selected with go.work.
+func applyGoWorkspaceOverrides(goCmd, packagePath string) error {
+	workFile := strings.TrimSpace(os.Getenv("GOWORK"))
+	if workFile == "" || strings.EqualFold(workFile, "off") || strings.EqualFold(workFile, "auto") {
+		return nil
+	}
+	if !filepath.IsAbs(workFile) {
+		return nil
+	}
+	cmd := exec.Command(goCmd, "work", "edit", "-json")
+	cmd.Dir = filepath.Dir(workFile)
+	cmd.Env = os.Environ()
+	out, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+	var parsed struct {
+		Use []struct {
+			DiskPath   string
+			ModulePath string
+		}
+	}
+	if err := json.Unmarshal(out, &parsed); err != nil {
+		return fmt.Errorf("failed to parse inherited Go workspace: %w", err)
+	}
+	self := readGoModulePath(packagePath)
+	for _, use := range parsed.Use {
+		modulePath := strings.TrimSpace(use.ModulePath)
+		diskPath := strings.TrimSpace(use.DiskPath)
+		if modulePath == "" || diskPath == "" || modulePath == self {
+			continue
+		}
+		if !filepath.IsAbs(diskPath) {
+			diskPath = filepath.Join(filepath.Dir(workFile), diskPath)
+		}
+		diskPath = filepath.Clean(diskPath)
+		if _, err := os.Stat(filepath.Join(diskPath, "go.mod")); err != nil {
+			continue
+		}
+		replace := exec.Command(goCmd, "mod", "edit", "-replace="+modulePath+"="+diskPath)
+		replace.Dir = packagePath
+		replace.Env = append(os.Environ(), "GOWORK=off")
+		if output, err := replace.CombinedOutput(); err != nil {
+			return fmt.Errorf("failed to preserve Go workspace module %q: %w\nOutput: %s", modulePath, err, output)
 		}
 	}
 	return nil
