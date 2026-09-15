@@ -9,7 +9,10 @@ Build AgentField as the reliable execution and recovery plane for agents: bounde
 - `PLAN.md` is the project/design SoT for North Star, phase goal, bounded batches, DoD, decisions, drift and next move.
 - Runtime/readback owns actual state; this file must not claim a loaded change without runtime evidence.
 - Code debugging, implementation, and validation are direct-target/container-first. Do not place Coding Station or any other helper/control-plane proxy in the critical path. GitHub/CI/deploy is publication/release boundary, not the inner coding loop.
-- SourceLoop canonicalizes only an exact delta already verified in DEV.
+- SourceLoop is a project-agnostic canonicalization/replay layer, not an SWE-specific feature. SWE-AF is the first reference implementation; the same contract must later onboard VPS Terminal, AgentField runtime, and other existing projects without redesigning the mechanism.
+- SourceLoop canonicalizes only an exact delta already verified in DEV. Its durable identity is a logical patch identity with provenance (`project`, canonical repo, runtime source root, exact base SHA, capture/change IDs, validation evidence, canonical commit generation), not a single immutable Git SHA.
+- DEV is a moving integration line; PROD is an immutable tested snapshot at an exact commit. Canonicalization (`VERIFIED -> CANONICAL`) is separate from release promotion (`CANONICAL -> RELEASED`); no live runtime edit may auto-promote to production.
+- Upstream sync is replay/rebase of the ordered active SourceLoop patch stack onto a fresh upstream base. Each patch independently becomes CLEAN/REPLAYED, SUPERSEDED_BY_UPSTREAM, or CONFLICT requiring bounded repair + its regression test; full-fork blind merge is not the default.
 - Generic contract completion belongs in AgentField. FCM may select model/provider, but does not decide which obligations are satisfied.
 - Generalize current upstream structured-output recovery (`DiagnoseFieldFailures`, `BuildIncrementalFollowup`, session resume); do not build a second workflow engine.
 - Validators/runtime evidence override stale model self-report. Already-satisfied obligations are not repeated.
