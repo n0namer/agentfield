@@ -64,6 +64,47 @@ func NewOpenCodeProvider(binPath, serverURL string) *OpenCodeProvider {
 	return &OpenCodeProvider{BinPath: binPath, ServerURL: serverURL, runCLI: RunCLIWithStdin}
 }
 
+func watchStableSchemaOutput(ctx context.Context, outputDir string, cancel context.CancelFunc) {
+	if outputDir == "" {
+		return
+	}
+	path := OutputPath(outputDir)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	last := ""
+	stableReads := 0
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			data, err := os.ReadFile(path)
+			if err != nil || len(data) == 0 {
+				last = ""
+				stableReads = 0
+				continue
+			}
+			var object map[string]any
+			if err := json.Unmarshal(data, &object); err != nil || object == nil {
+				last = ""
+				stableReads = 0
+				continue
+			}
+			current := string(data)
+			if current == last {
+				stableReads++
+			} else {
+				last = current
+				stableReads = 1
+			}
+			if stableReads >= 3 {
+				cancel()
+				return
+			}
+		}
+	}
+}
+
 func (p *OpenCodeProvider) Execute(ctx context.Context, prompt string, options Options) (*RawResult, error) {
 	// opencode 1.14+ moved non-interactive execution to the `run` subcommand.
 	// The legacy top-level `-c <dir> -q -p <prompt>` surface was rebound:
@@ -175,7 +216,17 @@ func (p *OpenCodeProvider) Execute(ctx context.Context, prompt string, options O
 
 	startAPI := time.Now()
 
-	cliResult, err := p.runCLI(ctx, cmd, env, options.Cwd, options.timeout(), stdinPrompt)
+	cliCtx := ctx
+	stopCLIWatch := func() {}
+	if options.schemaOutputDir != "" {
+		var cancel context.CancelFunc
+		cliCtx, cancel = context.WithCancel(ctx)
+		stopCLIWatch = cancel
+		go watchStableSchemaOutput(cliCtx, options.schemaOutputDir, cancel)
+	}
+	defer stopCLIWatch()
+
+	cliResult, err := p.runCLI(cliCtx, cmd, env, options.Cwd, options.timeout(), stdinPrompt)
 	apiMS := int(time.Since(startAPI).Milliseconds())
 
 	if err != nil {
