@@ -109,5 +109,14 @@ DoD:
 - Golden comparison must fail on duplicate mutation, loss of preserved partial output, widened continuation, or changed fail-closed behavior.
 - Re-run affected harness tests + full Go SDK after golden coverage is added.
 
+### Batch E — native SWE runtime acceptance — ACTIVE (2026-09-15)
+DoD:
+- Work only inside existing AgentField containers/terminals; no PR, CI/CD, deploy or compose recreate while the runtime is not functionally green.
+- Preserve authoritative `/src/swe-af` runtime state and prove the bootstrap path does not discard accepted dirty work.
+- Bring the штатный `swe-planner` to active/ready through the existing AgentField control plane.
+- Pass one non-mutating native reasoner smoke through AgentField discovery/execution.
+- Pass one bounded `implement_issue` against the accepted runtime source and its canonical tests.
+- Pass a recovery canary proving no duplicate mutation/lost partial state after an interrupted or ambiguous execution.
+
 ## Next move
-Do not reconcile the fork, publish product code, merge, or redeploy yet. The direct runtime source now contains the intended three-file contract-completion delta and `git_diff_check` PASS; the operator registry/source-access gaps are closed. The next obligatory move is validation on this exact dirty runtime source using the deployment's own Go 1.25 `control-plane-build` / `go-reconcile` lane: run formatting check, the four new contract-completion tests plus existing incremental recovery, full harness regression, then full Go SDK regression. Only after those are PASS may Batch C rerun the native 27-assertion resilience E2E to exit code 0 and add the public-Runner contract-completion seam test; Batch D golden regression follows. Do not install Go ad hoc into runtime containers, do not use Coding Station, and do not publish/redeploy before these behavioral gates PASS.
+Do not publish, merge, reconcile forks, deploy, redeploy, or run release CI. The active blocker is SWE workforce bootstrap, not AgentField contract completion. Fresh runtime evidence shows the current workforce container exits `31` because baked `reconcile_dev_workspace.sh` requires pinned `swe-af` SHA `6f5b4382e6231721f60be7045b9d91fd85e34fb5` to equal current `origin/dev` (`dc39e0ffb990c766f1bba43263a2ec9ffe184443`). Authoritative `/src/swe-af` is detached at `58c4e0d19081bc52363c120b7963a34cebb1e894` with accepted dirty runtime changes; that HEAD is an ancestor of the pinned `6f5…`, and product-tree diff versus `6f5…` is already reduced to `PLAN.md` plus two probe/regression test files that are present untracked. The immediate container-first move is to restart only the existing exited workforce container (not the compose application), stale-safe patch its baked reconcile guard so exact pinned commits need only be reachable/accepted rather than equal to moving `origin/dev`, then run the Batch E native SWE acceptance ladder. Current DEV Terminal can live-patch `/opt`, but its typed lifecycle cannot resolve/restart an exited target; this exact lifecycle capability gap is the only blocker before the patch can be applied.
