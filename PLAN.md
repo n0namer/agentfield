@@ -96,6 +96,136 @@ Build AgentField as the reliable execution and recovery plane for agents: bounde
 - SWE upstream cutover is now source-level DONE. Fresh upstream `Agent-Field/SWE-AF:main@311f376a2f12df01134acd80384d599dd8039178` was reconciled through a temporary replay surface, not blind-rebased across the 336-vs-4 divergent history. Only one textual upstream conflict existed (`go/internal/node/register.go`); the merge kept upstream Pro/Furrow registration semantics and downstream `resume_build_id`. The parallel coding cutoff was replayed semantically as one logical patch (nested-module coder CWD + regression + prompt guardrails), explicitly excluding superseded `coderEnv`/venv/OpenCode-overlay baggage. Final `n0namer/swe-af:dev` product cutover commit is `0944bdfbfdb727caad12455085a561940306e29b`; upstream `311f376...` is its ancestor and the promoted tree `1642073e66812f25e7e15db25fdd83505ae1da9d` exactly matched the independently tested temporary tree. Fresh tests on exact published `dev@0944bdfb...` PASS: `go test ./internal/issue ./internal/node ./internal/roles/coding ./internal/prompts/coding -count=1`; `git diff --check` PASS.
 - SWE runtime cutover is now DONE. Live `/src/swe-af` was switched to exact `dev@5b54a1dd4c579fd41ddf141e20dd46259519322e` after freezing the old-generation dirty diff (`/tmp/swe-oldgen-cutover-20260915.patch`, SHA-256 `cdb5f3988f9ae606b304404b33837ac42ea52309355191913e7de6acfd32511a`) and classifying every tracked old-generation delta. Live affected validation PASS: `go test ./internal/issue ./internal/node ./internal/roles/coding ./internal/prompts/coding -count=1`. Durable `agentfield-dev-workforce` registry advanced rev30→31 changing only SourceLoop writeback branch `main→dev`; `.source-commit` equals the live HEAD. Ephemeral canary capture `vtchg_01e9dbec383d4df99e0207777b5c3f4b` independently proves new journal provenance `base_branch=dev`, `base_commit=5b54a1dd...`; the canary was deleted. Historical captures remain on their original old base and are not rewritten.
 
+## Universal upstream synchronization architecture
+
+This is the default synchronization architecture for every project that carries local/downstream changes while consuming an external or canonical upstream. Project-specific deviations require an explicit SoT decision; they are not inferred from repository history.
+
+### Goal and invariants
+The goal is to update to a fresh upstream without losing verified downstream intent, without turning Git branches into the patch database, and without confusing source publication with runtime loading.
+
+1. **One moving integration line.** Each project has one long-lived downstream `dev` integration line. `main` is the accepted/release line or clean upstream mirror according to that project's SoT; PROD is always an exact accepted SHA/tag, never a moving branch name.
+2. **Logical patch identity outlives Git SHA.** Durable downstream intent is represented as a logical patch record. Git commits are materialized generations of that patch on a particular base. A rebase/replay changing the commit SHA does not create a new logical patch.
+3. **Exact provenance before mutation.** Every captured change records project/repository, runtime source root, exact base SHA, base branch, capture/change IDs, affected paths, and validation evidence. Unknown base or ambiguous owner fails closed.
+4. **Replay intent, not history.** Upstream synchronization replays the ordered ACTIVE logical patch stack onto a fresh upstream-derived base. It does not blindly rebase/merge an arbitrarily divergent fork history.
+5. **Semantic conflict resolution.** Textual conflict resolution must preserve current intent and current upstream contracts; stale implementation baggage is not resurrected merely because it existed in an older patch generation.
+6. **Differential verification.** A failure seen after replay is attributed to the patch only when it does not reproduce on the corresponding clean baseline. Baseline/environment failures are recorded separately and do not silently block or falsely fail the patch.
+7. **Source and runtime are separate states.** Publishing a new `dev` generation does not imply the DEV runtime loaded it. Runtime cutover requires exact source identity readback plus post-cutover validation before SourceLoop provenance advances.
+8. **Historical evidence is immutable.** Old captures remain bound to the base on which they were observed. Never rewrite old provenance to make history look cleaner.
+9. **No branch explosion.** Permanent `sourceloop/<patch>` branches are not the patch registry. Temporary replay/conflict branches or worktrees exist only for unresolved integration work and are retired after accepted integration.
+10. **Release is a separate promotion.** `VERIFIED -> CANONICAL_ON_DEV` and `CANONICAL_ON_DEV -> RELEASED` are distinct gates. PR/CI/deploy may be used at the release boundary but are not prerequisites for container-first capture/replay.
+
+### Minimal logical patch record
+The first implementation should keep this deliberately small; do not build a new workflow engine.
+
+- `logical_patch_id`: stable identity.
+- `project`, `repository`, `runtime_root`.
+- `intent`: one-sentence behavioral invariant.
+- `state`: `ACTIVE | SUPERSEDED | HOLD | RETIRED`.
+- `order`: position in the active replay stack when ordering matters.
+- `generation[]`: `{base_sha, materialized_commit_sha, capture_ids, affected_paths, validation_evidence, result}`.
+- generation `result`: `REPLAYED | SUPERSEDED_BY_UPSTREAM | CONFLICT_REPAIRED | HOLD`.
+- `regressions`: deterministic tests/checks that prove the behavior.
+- optional `depends_on[]`: only when replay order is semantically required; avoid speculative dependency graphs.
+
+A branch name, PR number, or commit SHA alone is never sufficient logical-patch identity.
+
+### Synchronization state machine
+
+`OBSERVE -> FREEZE_GENERATION -> BUILD_FRESH_BASE -> REPLAY -> VERIFY -> ADVANCE_DEV -> RUNTIME_CUTOVER -> PROVE_NEW_PROVENANCE -> RESUME`
+
+**OBSERVE**
+- Read project SoT/`AGENTS.md`, exact `dev`, exact upstream, runtime `HEAD`, `.source-commit`/equivalent, dirty state, active mutators, and current SourceLoop binding.
+- If source owner, runtime identity, or base is ambiguous: read-only diagnosis only.
+
+**FREEZE_GENERATION**
+- Define a cutoff for the current runtime generation.
+- Finish/capture only already-started atomic work; new work after cutoff belongs to the next generation queue.
+- Preserve exact dirty delta before destructive source switching. Classify every changed path `KEEP | DROP | HOLD/UNKNOWN`.
+
+**BUILD_FRESH_BASE**
+- Fetch/read the new upstream exact SHA.
+- Use a temporary worktree/branch from the project's accepted integration base; never mutate the dirty live checkout just to discover conflicts.
+- For legacy repositories without a mature patch registry, run merge/replay analysis to establish a one-time reconciled baseline, then switch to logical-patch replay for subsequent syncs.
+
+**REPLAY**
+- Apply ACTIVE patches in order.
+- For each patch: clean apply -> `REPLAYED`; equivalent behavior already upstream -> `SUPERSEDED_BY_UPSTREAM`; conflict -> semantic repair preserving current intent; no current requirement/evidence -> `HOLD` rather than resurrection.
+- Run the patch's regression immediately after its replay before layering more patches where practical.
+
+**VERIFY**
+- Run affected deterministic regressions and the smallest canonical package/suite checks.
+- Run `diff --check`/format/static checks appropriate to the project.
+- When a broader suite fails, compare the same failing test on the clean fresh baseline before attributing it to replay. Record flaky/environment/baseline debt separately.
+- Before publication, tested source bytes/tree identity must equal the source being promoted.
+
+**ADVANCE_DEV**
+- Fresh-read remote `dev`; abort/replan on concurrent movement.
+- Advance only the single `dev` integration line to the verified replay result. Temporary replay surfaces are retired after readback.
+- Parallel post-cutoff work remains queued and is replayed as the next generation; it is never silently folded into the previous cutoff.
+
+**RUNTIME_CUTOVER**
+- Prove no active mutator will be orphaned.
+- Preserve any remaining old-generation dirty delta, then switch the existing runtime source to exact accepted `dev` using the authoritative owner route; do not create replacement infrastructure merely for sync.
+- Read back runtime `HEAD` and source-identity marker; they must exactly equal the accepted `dev` SHA.
+- Run the affected runtime validation again on the actual live source.
+
+**PROVE_NEW_PROVENANCE**
+- Only after runtime readback passes, update SourceLoop binding/base branch to the new generation.
+- Produce one bounded ephemeral capture/probe proving new journal provenance resolves to the new branch + exact base SHA, then remove the probe.
+- Never relabel historical captures.
+
+**RESUME**
+- Normal container-first programming resumes on the new generation. The next durable change is a new logical patch/capture against the new `dev` base.
+
+### Parallel-development generation rule
+A sync must not require stopping all development for a long interval. Use a generation cutoff:
+
+- generation `N`: all verified/captured work at or before cutoff; replayed onto fresh upstream now.
+- generation `N+1`: work created after cutoff; remains queued while `N` is replayed and is applied only after the new `dev` baseline is accepted.
+- never let a moving dirty runtime continuously expand the in-flight replay scope.
+
+This converts parallel development from an unbounded merge race into two bounded queues.
+
+### Conflict policy
+Prefer, in order:
+1. current upstream contract + current downstream behavioral invariant;
+2. existing project-native replacement API/implementation;
+3. minimal semantic adaptation plus regression;
+4. `HOLD` when current intent cannot be proven.
+
+Do not choose `ours`/`theirs` mechanically when the implementation architecture changed. A semantic replay may intentionally drop historical implementation details while preserving the tested behavior.
+
+### Legacy bootstrap rule
+For a project first adopting this architecture:
+- do not attempt to reconstruct every historical commit as a logical patch;
+- identify the current accepted downstream tree, fresh upstream, known durable local behaviors, and UNKNOWN drift;
+- perform one bounded legacy reconciliation to create a tested `dev` baseline;
+- establish logical patch identities only for durable behavior that must survive future upstream updates;
+- from that baseline onward, all new durable changes follow normal capture -> logical patch -> replay generations.
+
+### Release and rollback
+- `dev` is integration, not production identity.
+- release selects one exact tested source SHA/tag/artifact and records provenance.
+- rollback moves the release/runtime pointer to a previously accepted exact SHA; it does not reverse or rewrite SourceLoop history.
+- build/release provenance should retain exact source/material identities so the deployed artifact can be traced to the accepted source generation.
+
+### 80/20 implementation priority
+Do these first because they eliminate most operational risk with little new machinery:
+1. enforce exact `{repo, runtime_root, base_branch, base_sha}` binding + immutable capture provenance;
+2. add first-class `logical_patch_id` with generations and regression evidence;
+3. standardize the temporary replay + differential baseline test + single-`dev` advancement procedure;
+4. standardize runtime cutover readback + one ephemeral provenance probe.
+
+Defer until evidence demands them: complex patch-dependency solvers, automatic conflict synthesis, permanent patch branches, per-patch PRs, new synchronization services, or organization-wide CI orchestration.
+
+### Evidence basis / design rationale
+- Empirical CI research supports frequent integration and short-lived divergence; merge conflicts are costly and error-prone, so keeping one integration line plus temporary isolated replay surfaces reduces coordination state rather than multiplying permanent branches.
+- Change-propagation research shows that changes have ripple effects and long-term propagation channels; replay therefore verifies behavioral intent and affected regressions rather than treating textual patch application as correctness.
+- Empirical work on unrelated CI failures supports differential baseline reproduction before attributing a failing check to the current patch.
+- SLSA provenance principles support recording exact source/material identities and separating source revision/provenance from later build/release artifacts.
+- BMAD current method is used as process shape, not infrastructure: `bmad-architecture` for explicit architecture/validation, `bmad-build` for observe -> smallest implementation -> verify, and evidence-backed review before declaring a gate closed. No separate BMAD runtime is required.
+- External skill review reinforced only reusable primitives: native Git worktrees/base detection/recovery, explicit integration-state inspection, atomic changes, and verification-before-completion. Project SoT overrides generic Gitflow/PR conventions where they conflict with the single-`dev`, container-first model.
+
 ## Universal SourceLoop onboarding contract
 Apply this same contract to every existing project; do not redesign SourceLoop per repository.
 1. Identify one canonical repository/branch and, where applicable, one upstream repository/branch. Ambiguous source ownership is `SOURCE_OWNER_UNKNOWN` and blocks canonicalization.
