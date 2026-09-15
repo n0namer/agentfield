@@ -64,7 +64,7 @@ Build AgentField as the reliable execution and recovery plane for agents: bounde
 - Batch D golden regression is now loaded directly into runtime `parity_test.go` as `TestContractCompletionGoldenSnapshots` (readback SHA `6bc3493e8251ed138817bbd4174a1602085b3c2fcebc84829810dc98cb638a17`; SourceLoop capture `vtchg_77bbbf0d559c4565b1a6cc548ba63fd8`). It freezes exact snapshots for satisfied+missing, invalid, UNKNOWN/fail-closed, ambiguous observed-effect suppression, and successful incremental repair with one provider call while preserving `title=hello` and repairing `body=world`. A byte-identical validation copy passed the golden test (`ok`, 0.009s), full harness (`ok`, 7.329s), full Go SDK, and fresh runtime `git_diff_check`. This closes Batch D.
 
 ## Current Phase Goal
-Prove the smallest deterministic contract-completion loop on exact upstream: observed truth overrides self-report; completed effects are never repeated; unresolved obligations produce the smallest safe continuation; ambiguous mutation state fails closed. Keep the exact-source delta container-first and publish only after deterministic verification.
+Complete native SWE runtime acceptance on the existing AgentField container stack before any publication/release work. Keep all implementation/debugging container-first. The phase is complete only when the штатный `swe-planner` is active/ready, a non-mutating native reasoner smoke succeeds, one bounded `implement_issue` succeeds against the accepted runtime source with canonical tests, and a recovery canary proves the execution can resume/fail safely without duplicate mutation or lost partial work.
 
 ## Bounded 30-minute batches
 ### Batch A — exact-source RED readiness — DONE (2026-09-14)
