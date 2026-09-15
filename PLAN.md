@@ -226,6 +226,61 @@ Defer until evidence demands them: complex patch-dependency solvers, automatic c
 - BMAD current method is used as process shape, not infrastructure: `bmad-architecture` for explicit architecture/validation, `bmad-build` for observe -> smallest implementation -> verify, and evidence-backed review before declaring a gate closed. No separate BMAD runtime is required.
 - External skill review reinforced only reusable primitives: native Git worktrees/base detection/recovery, explicit integration-state inspection, atomic changes, and verification-before-completion. Project SoT overrides generic Gitflow/PR conventions where they conflict with the single-`dev`, container-first model.
 
+## AgentField upstream cutover — 2026-09-16
+
+**Status: PARTIAL / active source-reconciliation. No deploy, redeploy, PR, merge-to-release, or release CI has been performed.**
+
+AgentField is now the second concrete proving ground for the universal synchronization architecture, after SWE-AF. The same architecture applies, but current runtime acceptance remains authoritative: do not sacrifice the active native SWE runtime gate merely to make Git history look current.
+
+### Fresh observed state
+
+- Canonical fork: `n0namer/agentfield`.
+- Current downstream integration candidate: `dev@c0923acdfca043c2c07e3d34daaa09e2a7e41d38`.
+- Current upstream: `Agent-Field/agentfield:main@2180e30c7f1619a652635cf8e5038c36f4d0dc3e`.
+- User-observed divergence is 5 downstream commits and 91 upstream commits from the old common line; treat this as divergent history, not a fast-forward distance.
+- Exact five committed downstream patches are:
+  1. `948d20f41909e44cf3a1480a83377f10caaa3e2e` — repair persisted agent DID derivation paths on restart.
+  2. `e07dfcae940060d4e4a123f5aea7f2fbffe1a024` — restart-regression JSON assertions.
+  3. `4d337c1ae5104418311fcba414a1c2f85c2abb89` — preserve agent signing key across restart.
+  4. `b160245833ec51f5296905c32e49260a62c76e26` — Go SDK agent process identity / instance-id propagation plus in-flight cancellation on shutdown.
+  5. `c0923acdfca043c2c07e3d34daaa09e2a7e41d38` — restart generation and stale-state recovery hardening.
+- Existing fresh replay base already exists at `tmp/agentfield-replay-2180e30c@2180e30c7f1619a652635cf8e5038c36f4d0dc3e`; do not create another permanent branch for the same purpose.
+- Existing AgentField DEV stack is compose project `edshqtkwskg3lrczekhcmd71`; relevant existing containers include `control-plane`, `workforce`, `runtime-capture`, and exited reusable `control-plane-build`. No new container/service is required for synchronization.
+- Authoritative runtime source checkout is `/core-src/agentfield-runtime` in the existing AgentField source volume. Readback proves `.git/HEAD = c0923acdfca043c2c07e3d34daaa09e2a7e41d38`.
+- Runtime-capture chain `runtime-capture/agentfield/c0923acdfca0` preserves post-commit live SDK work from exact base `c0923acd...`. Latest observed capture head is `3f433227fb27c04bf2fa817fc57b376da60478b5`; captures include Go harness durable-schema completion behavior (`schemaOutputDir`, `watchStableSchemaOutput`) and its regression surface.
+- Upstream exact-symbol search does not currently contain `InstanceID`, `repairLoadedAgentDerivationPaths`, or `watchStableSchemaOutput`; therefore those behaviors are **not proven superseded** and must enter replay classification rather than being dropped automatically.
+- Current old-generation SDK baseline is GREEN on exact runtime source through the existing `agentfield-dev-workforce` Go toolchain: `go test ./agent ./harness ./types -count=1` PASS from `/core-src/agentfield-runtime/sdk/go`.
+- A broad control-plane `./internal/services` filtered test invocation exceeded the 120 s execution bound without a test verdict; classify as `VALIDATION_BLOCKER/TIMEOUT`, not product failure. Subsequent validation must use narrower named restart/DID/node-status regressions first.
+- Direct generic Git workspace creation inside `agentfield-dev-runtime-capture` is blocked by enforced operator mediation (`REVIEW_REQUIRED: opaque_or_unknown_mutation`). Do not bypass this with Coding Station or a new helper container. Use an existing typed/allowed workspace route, or form the replay candidate source-side and validate it through the existing shared `/core-src` volume before any runtime cutover.
+
+### AgentField logical patch stack for replay
+
+Treat the five committed changes and the runtime-capture generation as behavioral patches, not as six permanent branches:
+
+- `AF-P1 restart-did-derivation-repair` — ACTIVE until fresh upstream proves an equivalent cryptographic restart invariant.
+- `AF-P2 restart-signing-key-regression` — ACTIVE as regression/evidence; may become test-only or SUPERSEDED if upstream already guarantees the same invariant.
+- `AF-P3 agent-process-instance-identity` — ACTIVE and high-priority because current native SWE acceptance blocker is `409 stale_agent_instance`; replay must validate registration, status update, lease renewal, and same-node/same-version process replacement semantics together.
+- `AF-P4 restart-generation-stale-state-recovery` — ACTIVE; semantic replay must prefer fresh upstream lifecycle APIs over restoring historical implementation details.
+- `AF-P5 harness-durable-schema-completion` — ACTIVE runtime-capture generation from `c0923acd...`; include `schemaOutputDir`/stable output completion behavior and its regression. Do not infer completeness merely from the latest capture commit; the full ordered runtime-capture chain is the evidence source.
+
+The exact mapping of `e07dfca` and `4d337c1` into AF-P1/AF-P2 is behavioral rather than one-commit-one-patch: tests may belong to the same logical invariant as the implementation they prove.
+
+### Required replay sequence
+
+1. **Freeze AgentField generation N.** Use `c0923acd...` plus the ordered `runtime-capture/agentfield/c0923acdfca0` chain as immutable old-generation evidence. New edits after the cutoff belong to generation N+1.
+2. **Fresh base.** Reuse exact upstream replay base `2180e30c...`; do not rebase the live runtime checkout.
+3. **Classify/replay AF-P1..AF-P5 in semantic order.** For each: `REPLAYED`, `SUPERSEDED_BY_UPSTREAM`, `CONFLICT_REPAIRED`, or `HOLD`. Exact-symbol absence alone is not sufficient to prove necessity; regression behavior decides.
+4. **Targeted validation first.** At minimum: Go SDK agent lifecycle/instance-ID tests, harness durable-schema-output regression, DID restart/signing-key regressions, and control-plane node registration/status/lease stale-instance behavior. Broader suites follow only after targeted GREEN.
+5. **Differential baseline.** Any failure after replay must be rerun on clean upstream `2180e30c...` before attribution to a downstream patch.
+6. **Advance one `dev` line only after source GREEN.** Fresh-read remote `dev` first; abort/replan on concurrent movement. No permanent per-patch branches.
+7. **Runtime cutover remains a separate gate.** Only after accepted source candidate exists and current native-runtime work is safely quiesced may `/core-src/agentfield-runtime` move to the accepted `dev` SHA. Preserve any remaining old-generation delta first.
+8. **Post-cutover proof.** Read back exact runtime source identity; run the same targeted validations on live source; only then advance AgentField SourceLoop/writeback provenance from its current old branch/base to the new `dev` generation and prove it with one ephemeral capture.
+9. **Do not deploy/redeploy or use release CI** merely to accomplish source synchronization. Existing container-first runtime remains the validation surface.
+
+### Current bounded next move
+
+Find/use an **existing mediated writable replay surface** in the AgentField DEV stack (shared source/workspace volume or another already-registered target) that can materialize `2180e30c...` without creating new infrastructure. Replay AF-P1..AF-P5 there, starting with the instance-ID/stale-instance contract because it is both a local patch and the current native SWE acceptance blocker. Run targeted SDK/control-plane regressions after each semantic replay step. Stop before `dev` advancement or runtime cutover unless the replay candidate is GREEN and remote/runtime state is freshly re-read.
+
 ## Universal SourceLoop onboarding contract
 Apply this same contract to every existing project; do not redesign SourceLoop per repository.
 1. Identify one canonical repository/branch and, where applicable, one upstream repository/branch. Ambiguous source ownership is `SOURCE_OWNER_UNKNOWN` and blocks canonicalization.
