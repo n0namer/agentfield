@@ -48,6 +48,7 @@ func NodeStatusLeaseHandler(storageProvider storage.StorageProvider, statusManag
 		var payload struct {
 			Phase       string `json:"phase"`
 			Version     string `json:"version"`
+			InstanceID  string `json:"instance_id,omitempty"`
 			HealthScore *int   `json:"health_score"`
 			// Conditions are accepted for future use but currently ignored by the control plane.
 			Conditions []map[string]interface{} `json:"conditions"`
