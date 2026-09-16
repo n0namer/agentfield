@@ -61,10 +61,13 @@ func NewOpenCodeProvider(binPath, serverURL string) *OpenCodeProvider {
 	if serverURL == "" {
 		serverURL = os.Getenv("OPENCODE_SERVER")
 	}
-	return &OpenCodeProvider{BinPath: binPath, ServerURL: serverURL, runCLI: RunCLIWithStdin}
+	runOpenCodeCLI := func(ctx context.Context, cmd []string, env map[string]string, cwd string, timeout int, stdin []byte) (*CLIResult, error) {
+		return runCLIWithStdinIdle(ctx, cmd, env, cwd, timeout, 0, stdin)
+	}
+	return &OpenCodeProvider{BinPath: binPath, ServerURL: serverURL, runCLI: runOpenCodeCLI}
 }
 
-func watchStableSchemaOutput(ctx context.Context, outputDir string, cancel context.CancelFunc) {
+func watchStableCompleteSchemaOutput(ctx context.Context, outputDir string, cancel context.CancelFunc, completed chan<- struct{}) {
 	if outputDir == "" {
 		return
 	}
@@ -90,6 +93,12 @@ func watchStableSchemaOutput(ctx context.Context, outputDir string, cancel conte
 				stableReads = 0
 				continue
 			}
+			isComplete, ok := object["complete"].(bool)
+			if !ok || !isComplete {
+				last = ""
+				stableReads = 0
+				continue
+			}
 			current := string(data)
 			if current == last {
 				stableReads++
@@ -98,6 +107,10 @@ func watchStableSchemaOutput(ctx context.Context, outputDir string, cancel conte
 				stableReads = 1
 			}
 			if stableReads >= 3 {
+				select {
+				case completed <- struct{}{}:
+				default:
+				}
 				cancel()
 				return
 			}
