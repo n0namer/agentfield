@@ -165,10 +165,12 @@ func HeartbeatHandler(storageProvider storage.StorageProvider, uiService *servic
 			// Verify node exists only when we need to update DB.
 			// Use the outer-scoped existingNode so it's available for status processing below.
 			var err error
-			if enhancedHeartbeat.Version != "" {
-				existingNode, err = storageProvider.GetAgentVersion(ctx, nodeID, enhancedHeartbeat.Version)
-			} else {
-				existingNode, err = storageProvider.GetAgent(ctx, nodeID)
+			if existingNode == nil {
+				if enhancedHeartbeat.Version != "" {
+					existingNode, err = storageProvider.GetAgentVersion(ctx, nodeID, enhancedHeartbeat.Version)
+				} else {
+					existingNode, err = storageProvider.GetAgent(ctx, nodeID)
+				}
 			}
 			if err != nil {
 				logger.Logger.Error().Err(err).Msgf("❌ Node %s not found during heartbeat update", nodeID)
