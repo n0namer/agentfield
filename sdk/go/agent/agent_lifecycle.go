@@ -276,6 +276,7 @@ func (a *Agent) waitForApproval(ctx context.Context) error {
 func (a *Agent) markReady(ctx context.Context) error {
 	score := 100
 	_, err := a.client.UpdateStatus(ctx, a.cfg.NodeID, types.NodeStatusUpdate{
+		InstanceID:  a.instanceID,
 		Phase:       "ready",
 		Version:     a.cfg.Version,
 		HealthScore: &score,
