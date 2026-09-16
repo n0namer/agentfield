@@ -82,6 +82,70 @@ func TestHeartbeatHandler_EmptyNodeIDReturnsBadRequest(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "node_id is required")
 }
 
+func TestHeartbeatHandler_RejectsStaleInstanceBeforePresenceTouch(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	heartbeatCache = &HeartbeatCache{nodes: make(map[string]*CachedNodeData)}
+	store := &nodeRESTStorageStub{versionedAgent: &types.AgentNode{ID: "node-stale", Version: "old-version", InstanceID: "instance-new", LifecycleStatus: types.AgentStatusReady}}
+	presence := services.NewPresenceManager(nil, services.PresenceManagerConfig{})
+	router := gin.New()
+	router.POST("/nodes/:node_id/heartbeat", HeartbeatHandler(store, nil, nil, nil, presence))
+	req := httptest.NewRequest(http.MethodPost, "/nodes/node-stale/heartbeat", strings.NewReader(`{"status":"ready","version":"old-version","instance_id":"instance-old"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusConflict, rec.Code)
+	assert.False(t, presence.HasLease("node-stale"), "stale heartbeat must not extend current instance presence")
+	store.mu.Lock()
+	heartbeats := len(store.heartbeats)
+	store.mu.Unlock()
+	assert.Zero(t, heartbeats)
+}
+
+func TestHeartbeatHandler_RejectsMissingInstanceAfterModernRegistration(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	heartbeatCache = &HeartbeatCache{nodes: make(map[string]*CachedNodeData)}
+	store := &nodeRESTStorageStub{versionedAgent: &types.AgentNode{ID: "node-modern", Version: "v1", InstanceID: "instance-new", LifecycleStatus: types.AgentStatusReady}}
+	presence := services.NewPresenceManager(nil, services.PresenceManagerConfig{})
+	router := gin.New()
+	router.POST("/nodes/:node_id/heartbeat", HeartbeatHandler(store, nil, nil, nil, presence))
+	req := httptest.NewRequest(http.MethodPost, "/nodes/node-modern/heartbeat", strings.NewReader(`{"status":"ready","version":"v1"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusConflict, rec.Code)
+	assert.False(t, presence.HasLease("node-modern"))
+	store.mu.Lock()
+	heartbeats := len(store.heartbeats)
+	store.mu.Unlock()
+	assert.Zero(t, heartbeats)
+}
+
+func TestHeartbeatHandler_AcceptsCurrentVersionedInstance(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	heartbeatCache = &HeartbeatCache{nodes: make(map[string]*CachedNodeData)}
+	store := &nodeRESTStorageStub{versionedAgent: &types.AgentNode{ID: "node-current", Version: "v2", InstanceID: "instance-current", LifecycleStatus: types.AgentStatusReady}}
+	router := gin.New()
+	router.POST("/nodes/:node_id/heartbeat", HeartbeatHandler(store, nil, nil, nil, nil))
+	req := httptest.NewRequest(http.MethodPost, "/nodes/node-current/heartbeat", strings.NewReader(`{"status":"ready","version":"v2","instance_id":"instance-current"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestHeartbeatHandler_AcceptsLegacyVersionWithoutInstanceID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	heartbeatCache = &HeartbeatCache{nodes: make(map[string]*CachedNodeData)}
+	store := &nodeRESTStorageStub{versionedAgent: &types.AgentNode{ID: "node-legacy", Version: "v1", InstanceID: "", LifecycleStatus: types.AgentStatusReady}}
+	router := gin.New()
+	router.POST("/nodes/:node_id/heartbeat", HeartbeatHandler(store, nil, nil, nil, nil))
+	req := httptest.NewRequest(http.MethodPost, "/nodes/node-legacy/heartbeat", strings.NewReader(`{"status":"ready","version":"v1"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+}
+
 func TestHeartbeatHandler_RegistersHealthMonitorAndTouchesPresence(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	heartbeatCache = &HeartbeatCache{nodes: make(map[string]*CachedNodeData)}
