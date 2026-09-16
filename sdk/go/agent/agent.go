@@ -1992,9 +1992,8 @@ func nextCallPollInterval(current time.Duration) time.Duration {
 // (see submitAsyncExecution / awaitExecutionResult), so a brief control-plane
 // outage does not kill a long-running call. A child reasoner may run
 // arbitrarily long; the overall wait is bounded only by ctx. Cancelling ctx
-// aborts the wait but does NOT cancel the child execution server-side — the
-// child keeps running on its node and the control plane records its result
-// (the Python SDK behaves the same way when the caller stops waiting).
+// aborts the wait and best-effort propagates cancellation to the submitted
+// child execution so a completed parent cannot leave an orphan mutation alive.
 func (a *Agent) Call(ctx context.Context, target string, input map[string]any) (map[string]any, error) {
 	if strings.TrimSpace(a.cfg.AgentFieldURL) == "" {
 		return nil, errors.New("AgentFieldURL is required to call other reasoners")
