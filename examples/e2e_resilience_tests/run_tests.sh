@@ -511,7 +511,7 @@ stream_exec_id=$(json_get "$exec_result" "execution_id")
 
 if [ "$stream_exec_id" != "null" ] && [ -n "$stream_exec_id" ]; then
     # Read SSE events for a few seconds
-    sse_output=$(timeout 5 curl -s -N "$AF_URL/api/ui/v1/executions/$stream_exec_id/logs/stream" 2>/dev/null || true)
+    sse_output=$(timeout 5 "$(command -v curl)" -s -N -H "X-API-Key: $E2E_API_KEY" "$AF_URL/api/ui/v1/executions/$stream_exec_id/logs/stream" 2>/dev/null || true)
 
     if echo "$sse_output" | grep -q "connected"; then
         pass "SSE log stream connects and sends initial event"
