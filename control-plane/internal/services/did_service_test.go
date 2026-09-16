@@ -584,3 +584,40 @@ func TestDIDService_GetAgentFieldServerID_NotInitialized(t *testing.T) {
 	require.Contains(t, err.Error(), "not initialized")
 	_ = ctx
 }
+
+func TestDIDServiceRestartPreservesAgentSigningKey(t *testing.T) {
+	service, _, provider, _, agentfieldID := setupDIDTestEnvironment(t)
+
+	req := &types.DIDRegistrationRequest{
+		AgentNodeID: "agent-restart",
+		Reasoners:   []types.ReasonerDefinition{{ID: "reasoner.restart"}},
+		Skills:      []types.SkillDefinition{{ID: "skill.restart", Tags: []string{"restart"}}},
+	}
+
+	first, err := service.RegisterAgent(req)
+	require.NoError(t, err)
+	require.True(t, first.Success)
+	require.NotEmpty(t, first.IdentityPackage.AgentDID.DID)
+
+	reloadedRegistry := NewDIDRegistryWithStorage(provider)
+	require.NoError(t, reloadedRegistry.Initialize())
+
+	keystoreDir := filepath.Join(t.TempDir(), "keys-reloaded")
+	ks, err := NewKeystoreService(&config.KeystoreConfig{Path: keystoreDir, Type: "local"})
+	require.NoError(t, err)
+	cfg := &config.DIDConfig{Enabled: true, Keystore: config.KeystoreConfig{Path: keystoreDir, Type: "local"}}
+	reloadedService := NewDIDService(cfg, ks, reloadedRegistry)
+	require.NoError(t, reloadedService.Initialize(agentfieldID))
+
+	second, err := reloadedService.RegisterAgent(req)
+	require.NoError(t, err)
+	require.True(t, second.Success)
+	require.Equal(t, first.IdentityPackage.AgentDID.DID, second.IdentityPackage.AgentDID.DID)
+
+	var privateJWK map[string]any
+	require.NoError(t, json.Unmarshal([]byte(second.IdentityPackage.AgentDID.PrivateKeyJWK), &privateJWK))
+	var publicJWK map[string]any
+	require.NoError(t, json.Unmarshal([]byte(second.IdentityPackage.AgentDID.PublicKeyJWK), &publicJWK))
+	require.NotEmpty(t, privateJWK["x"])
+	require.Equal(t, publicJWK["x"], privateJWK["x"], "re-derived private key must match persisted DID public key after restart")
+}
