@@ -123,6 +123,11 @@ type Options struct {
 	//
 	// Mirrors the Python SDK's schema_mode argument to .harness().
 	SchemaMode string
+
+	// schemaOutputDir is runner-owned internal state for schema-constrained
+	// OpenCode runs. Providers may observe durable completion markers here,
+	// but it is intentionally not part of the public Options contract.
+	schemaOutputDir string
 }
 
 func (o Options) maxRetries() int {
