@@ -136,6 +136,7 @@ if [[ "${1:-}" != "--skip-setup" ]]; then
 
     log "Starting control plane on port $AF_PORT..."
     AGENTFIELD_PORT="$AF_PORT" \
+    AGENTFIELD_API_KEY="$E2E_API_KEY" \
     AGENTFIELD_LLM_HEALTH_ENABLED=true \
     AGENTFIELD_LLM_HEALTH_ENDPOINT="$MOCK_LLM_URL/health" \
     AGENTFIELD_LLM_HEALTH_ENDPOINT_NAME="mock-litellm" \
