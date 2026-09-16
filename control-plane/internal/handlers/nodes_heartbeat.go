@@ -134,6 +134,26 @@ func HeartbeatHandler(storageProvider storage.StorageProvider, uiService *servic
 			}
 		}
 
+		// Fence ownership against the authoritative serving version. Versioned
+		// agents/canaries are first-class AgentField nodes, so a versioned
+		// heartbeat must resolve that version instead of requiring a default row.
+		// Legacy stored empty instance IDs remain compatible; once the serving
+		// version has a modern instance ID, missing or mismatched owners are stale.
+		var currentNode *types.AgentNode
+		var err error
+		if enhancedHeartbeat.Version != "" {
+			currentNode, err = storageProvider.GetAgentVersion(ctx, nodeID, enhancedHeartbeat.Version)
+		} else {
+			currentNode, err = storageProvider.GetAgent(ctx, nodeID)
+		}
+		if err != nil || currentNode == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+			return
+		}
+		if rejectStaleAgentInstance(c, enhancedHeartbeat.InstanceID, currentNode) {
+			return
+		}
+
 		// Check if database update is needed using caching
 		now := time.Now().UTC()
 		if presenceManager != nil && presenceManager.HasLease(nodeID) {
