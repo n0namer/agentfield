@@ -338,6 +338,9 @@ func (r *Runner) executeWithRetry(ctx context.Context, provider Provider, prompt
 			lastErr = err
 			if isTransient(err.Error()) && attempt < maxRetries {
 				sleepWithJitter(ctx, initialDelay, maxDelay, backoff, attempt)
+				if ctx.Err() != nil {
+					return nil, ctx.Err()
+				}
 				continue
 			}
 			return nil, err
@@ -350,6 +353,9 @@ func (r *Runner) executeWithRetry(ctx context.Context, provider Provider, prompt
 		errMsg := raw.ErrorMessage
 		if isTransient(errMsg) && attempt < maxRetries {
 			sleepWithJitter(ctx, initialDelay, maxDelay, backoff, attempt)
+			if ctx.Err() != nil {
+				return raw, ctx.Err()
+			}
 			continue
 		}
 		return raw, nil
