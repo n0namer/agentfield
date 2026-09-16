@@ -70,6 +70,9 @@ func NodeStatusLeaseHandler(storageProvider storage.StorageProvider, statusManag
 			c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
 			return
 		}
+		if rejectStaleAgentInstance(c, payload.InstanceID, agent) {
+			return
+		}
 
 		// Protect pending_approval from being overwritten by agent status updates.
 		// Skip all status changes — only renew the lease heartbeat timestamp.
