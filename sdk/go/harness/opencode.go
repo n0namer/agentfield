@@ -229,8 +229,28 @@ func (p *OpenCodeProvider) Execute(ctx context.Context, prompt string, options O
 
 	startAPI := time.Now()
 
-	cliResult, err := p.runCLI(ctx, cmd, env, options.Cwd, options.timeout(), stdinPrompt)
+	cliCtx := ctx
+	stopCLIWatch := func() {}
+	completed := make(chan struct{}, 1)
+	if options.schemaOutputDir != "" {
+		var cancelCLI context.CancelFunc
+		cliCtx, cancelCLI = context.WithCancel(ctx)
+		stopCLIWatch = cancelCLI
+		go watchStableCompleteSchemaOutput(cliCtx, options.schemaOutputDir, cancelCLI, completed)
+	}
+	defer stopCLIWatch()
+
+	cliResult, err := p.runCLI(cliCtx, cmd, env, options.Cwd, options.timeout(), stdinPrompt)
 	apiMS := int(time.Since(startAPI).Milliseconds())
+	semanticComplete := false
+	select {
+	case <-completed:
+		semanticComplete = true
+	default:
+	}
+	if semanticComplete && ctx.Err() == nil {
+		return &RawResult{Metrics: Metrics{DurationAPIMS: apiMS}, ReturnCode: 0}, nil
+	}
 
 	if err != nil {
 		// Check if it's a "not found" error
