@@ -216,7 +216,17 @@ func (p *OpenCodeProvider) Execute(ctx context.Context, prompt string, options O
 
 	startAPI := time.Now()
 
-	cliResult, err := p.runCLI(ctx, cmd, env, options.Cwd, options.timeout(), stdinPrompt)
+	cliCtx := ctx
+	stopCLIWatch := func() {}
+	if options.schemaOutputDir != "" {
+		var cancel context.CancelFunc
+		cliCtx, cancel = context.WithCancel(ctx)
+		stopCLIWatch = cancel
+		go watchStableSchemaOutput(cliCtx, options.schemaOutputDir, cancel)
+	}
+	defer stopCLIWatch()
+
+	cliResult, err := p.runCLI(cliCtx, cmd, env, options.Cwd, options.timeout(), stdinPrompt)
 	apiMS := int(time.Since(startAPI).Milliseconds())
 
 	if err != nil {
