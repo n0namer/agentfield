@@ -305,7 +305,7 @@ The exact mapping of `e07dfca` and `4d337c1` into AF-P1/AF-P2 is behavioral rath
 
 ### Current bounded next move
 
-Restore the **existing** AgentField workforce service/target through its authoritative Coolify owner route; do not create a replacement container or Coding Station path. After fresh target identity/readback succeeds, resume exactly at AF-P4 targeted stale-instance regressions on the fresh-upstream replay source, then complete only the still-non-superseded behavioral slices and AF-P5 harness replay. Run differential baseline checks, and only after source GREEN consider advancing the single `dev` line. No deploy/redeploy of AgentField product code, PR, release CI, runtime cutover, or provenance rebinding before source GREEN.
+The AgentField synchronization/cutover batch is closed. Normal container-first DEV work resumes from exact `n0namer/agentfield:dev@26841718c42d2a7fb9008014f4a1d552f945bac6`; new runtime edits must be captured against that `dev` base and preserved on generation recovery/capture branches without writing directly to `dev`. The next architecture implementation priority remains first-class logical-patch linkage (`logical_patch_id -> generations -> captures -> regressions -> canonical dev commit`) so recovery branches/PRs remain evidence surfaces rather than patch identity. Do not promote `dev` to `main` or merge runtime-capture PRs merely because they exist; release promotion remains a separate tested decision.
 
 ## Universal SourceLoop onboarding contract
 Apply this same contract to every existing project; do not redesign SourceLoop per repository.
