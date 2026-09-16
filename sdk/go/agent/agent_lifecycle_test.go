@@ -216,6 +216,23 @@ func TestWaitForApproval_CompletesAfterPollAndLogsPollingErrors(t *testing.T) {
 	assert.GreaterOrEqual(t, polls, 2)
 }
 
+func TestShutdownCancelsInFlightReasoners(t *testing.T) {
+	a, err := New(Config{NodeID: "node-1", Version: "1.0.0", Logger: log.New(io.Discard, "", 0)})
+	require.NoError(t, err)
+	ctx, release := a.registerCancellableExecution(context.Background(), "exec-1")
+	defer release()
+	require.NoError(t, a.shutdown(context.Background()))
+	select {
+	case <-ctx.Done():
+	case <-time.After(time.Second):
+		t.Fatal("shutdown did not cancel in-flight execution")
+	}
+	a.cancelMu.Lock()
+	left := len(a.cancelFuncs)
+	a.cancelMu.Unlock()
+	assert.Zero(t, left)
+}
+
 func TestShutdown_HandlesNilClientAndNilServer(t *testing.T) {
 	a, err := New(Config{
 		NodeID:  "node-1",
