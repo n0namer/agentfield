@@ -29,6 +29,11 @@ AF_PORT="${AGENTFIELD_PORT:-18080}"
 AF_URL="http://localhost:$AF_PORT"
 MOCK_LLM_PORT=14000
 MOCK_LLM_URL="http://localhost:$MOCK_LLM_PORT"
+E2E_API_KEY="${AGENTFIELD_E2E_API_KEY:-agentfield-e2e-test-key}"
+
+curl() {
+    command curl -H "X-API-Key: $E2E_API_KEY" "$@"
+}
 
 PIDS=()
 PASSED=0
