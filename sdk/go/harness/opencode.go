@@ -67,6 +67,57 @@ func NewOpenCodeProvider(binPath, serverURL string) *OpenCodeProvider {
 	return &OpenCodeProvider{BinPath: binPath, ServerURL: serverURL, runCLI: runOpenCodeCLI}
 }
 
+func watchStableCompleteSchemaOutput(ctx context.Context, outputDir string, cancel context.CancelFunc, completed chan<- struct{}) {
+	if outputDir == "" {
+		return
+	}
+	path := OutputPath(outputDir)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	last := ""
+	stableReads := 0
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			data, err := os.ReadFile(path)
+			if err != nil || len(data) == 0 {
+				last = ""
+				stableReads = 0
+				continue
+			}
+			var object map[string]any
+			if err := json.Unmarshal(data, &object); err != nil || object == nil {
+				last = ""
+				stableReads = 0
+				continue
+			}
+			isComplete, ok := object["complete"].(bool)
+			if !ok || !isComplete {
+				last = ""
+				stableReads = 0
+				continue
+			}
+			current := string(data)
+			if current == last {
+				stableReads++
+			} else {
+				last = current
+				stableReads = 1
+			}
+			if stableReads >= 3 {
+				select {
+				case completed <- struct{}{}:
+				default:
+				}
+				cancel()
+				return
+			}
+		}
+	}
+}
+
 func (p *OpenCodeProvider) Execute(ctx context.Context, prompt string, options Options) (*RawResult, error) {
 	// opencode 1.14+ moved non-interactive execution to the `run` subcommand.
 	// The legacy top-level `-c <dir> -q -p <prompt>` surface was rebound:
