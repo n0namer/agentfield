@@ -118,6 +118,7 @@ func HeartbeatHandler(storageProvider storage.StorageProvider, uiService *servic
 		// Try to parse enhanced heartbeat data (optional)
 		var enhancedHeartbeat struct {
 			Version     string `json:"version,omitempty"`
+			InstanceID  string `json:"instance_id,omitempty"`
 			Status      string `json:"status,omitempty"`
 			Timestamp   string `json:"timestamp,omitempty"`
 			HealthScore *int   `json:"health_score,omitempty"`
