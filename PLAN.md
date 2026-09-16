@@ -228,7 +228,7 @@ Defer until evidence demands them: complex patch-dependency solvers, automatic c
 
 ## AgentField upstream cutover — 2026-09-16
 
-**Status: PARTIAL / active source-reconciliation. No deploy, redeploy, PR, merge-to-release, or release CI has been performed.**
+**Status: DONE — upstream replay, single-`dev` publication, runtime cutover, deployment binding, and new-generation SourceLoop provenance are all verified. `main` remains the separate accepted/release line and was not rewritten.**
 
 AgentField is now the second concrete proving ground for the universal synchronization architecture, after SWE-AF. The same architecture applies, but current runtime acceptance remains authoritative: do not sacrifice the active native SWE runtime gate merely to make Git history look current.
 
