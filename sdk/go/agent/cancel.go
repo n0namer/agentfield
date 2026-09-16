@@ -47,6 +47,25 @@ func (a *Agent) registerCancellableExecution(parent context.Context, executionID
 // from inside the SDK. Mostly useful for tests and tools that drive the
 // SDK directly; the production trigger is the HTTP cancel endpoint.
 // Returns true if a matching execution was found and cancelled.
+func (a *Agent) cancelAllExecutions() int {
+	a.cancelMu.Lock()
+	cancels := make([]context.CancelFunc, 0, len(a.cancelFuncs))
+	for _, cancel := range a.cancelFuncs {
+		cancels = append(cancels, cancel)
+	}
+	a.cancelMu.Unlock()
+	for _, cancel := range cancels {
+		cancel()
+	}
+	return len(cancels)
+}
+
+func (a *Agent) clearExecutionCancellations() {
+	a.cancelMu.Lock()
+	clear(a.cancelFuncs)
+	a.cancelMu.Unlock()
+}
+
 func (a *Agent) CancelExecution(executionID string) bool {
 	executionID = strings.TrimSpace(executionID)
 	if executionID == "" {
