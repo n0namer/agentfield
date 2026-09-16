@@ -341,7 +341,7 @@ Run a **BMAD-managed SWE Capability & Quality Verification phase** on the curren
 - ASR-1 ACTIONABLE: feature inventory is not yet tied to one traceability matrix; a feature can be implemented/unit-tested but not proven enabled/reachable in CURRENT runtime.
 - ASR-2 ACTIONABLE: final task PASS can hide bad trajectory/tool ordering, duplicate work, excessive repair, or dormant feature flags; trajectory correctness needs its own gate.
 - ASR-3 ACTIONABLE: quality benefit of advisor/replanning/verifier/integration testing is not yet measured against feature-OFF baselines.
-- ASR-4 ACTIONABLE: long-running `fast-coding` makes 75s/300s synthetic cutoffs invalid for quality conclusions; acceptance budgets must distinguish time-to-first-useful-effect from total turn time and remain bounded.
+- ASR-4 ACTIONABLE: long-running `fast-coding` makes short synthetic cutoffs invalid for functional acceptance. During the current bring-up phase all roles stay on the fixed `broker/fast-coding` baseline and full-cycle acceptance uses `agent_timeout_seconds=900` per role; 30s/120s budgets are diagnostic canaries only. Latency/cost optimization is deferred until one complete public `build` reaches terminal clean success.
 - ASR-5 ACTIONABLE: interaction coverage is incomplete for combinations such as advisor+replan, parallel DAG+failure threshold, verifier+repair, and cancel+active child/tool call.
 - ASR-6 FYI: release/PR/GitHub-specific flows exist but remain outside the current inner-loop phase unless they block a core SWE contract.
 
