@@ -89,6 +89,7 @@ type NodeRegistrationResponse struct {
 
 // NodeStatusUpdate is used for lease renewals.
 type NodeStatusUpdate struct {
+	InstanceID  string `json:"instance_id,omitempty"`
 	Phase       string `json:"phase"`
 	Version     string `json:"version,omitempty"`
 	HealthScore *int   `json:"health_score,omitempty"`
