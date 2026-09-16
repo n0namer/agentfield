@@ -56,6 +56,16 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
+func newAgentInstanceID() (string, error) {
+	b := make([]byte, 16)
+	if _, err := crand.Read(b); err != nil {
+		return "", fmt.Errorf("generate agent instance id: %w", err)
+	}
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%x", b), nil
+}
+
 // HandlerFunc processes a reasoner invocation.
 type HandlerFunc func(ctx context.Context, input map[string]any) (any, error)
 
