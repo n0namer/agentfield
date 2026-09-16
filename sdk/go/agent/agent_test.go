@@ -880,6 +880,11 @@ func TestCall_CtxCancelAbortsWait(t *testing.T) {
 	assert.ErrorIs(t, err, context.Canceled)
 	assert.Nil(t, result)
 	assert.Less(t, time.Since(start), 5*time.Second, "cancel must abort the wait promptly")
+	select {
+	case <-childCancelled:
+	case <-time.After(time.Second):
+		t.Fatal("caller cancellation did not propagate to child execution")
+	}
 }
 
 func TestCall_ErrorHandling(t *testing.T) {
