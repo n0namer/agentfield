@@ -61,7 +61,10 @@ func NewOpenCodeProvider(binPath, serverURL string) *OpenCodeProvider {
 	if serverURL == "" {
 		serverURL = os.Getenv("OPENCODE_SERVER")
 	}
-	return &OpenCodeProvider{BinPath: binPath, ServerURL: serverURL, runCLI: RunCLIWithStdin}
+	runOpenCodeCLI := func(ctx context.Context, cmd []string, env map[string]string, cwd string, timeout int, stdin []byte) (*CLIResult, error) {
+		return runCLIWithStdinIdle(ctx, cmd, env, cwd, timeout, 0, stdin)
+	}
+	return &OpenCodeProvider{BinPath: binPath, ServerURL: serverURL, runCLI: runOpenCodeCLI}
 }
 
 func (p *OpenCodeProvider) Execute(ctx context.Context, prompt string, options Options) (*RawResult, error) {
