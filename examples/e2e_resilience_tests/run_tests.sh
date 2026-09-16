@@ -29,6 +29,11 @@ AF_PORT="${AGENTFIELD_PORT:-18080}"
 AF_URL="http://localhost:$AF_PORT"
 MOCK_LLM_PORT=14000
 MOCK_LLM_URL="http://localhost:$MOCK_LLM_PORT"
+E2E_API_KEY="${AGENTFIELD_E2E_API_KEY:-agentfield-e2e-test-key}"
+
+curl() {
+    command curl -H "X-API-Key: $E2E_API_KEY" "$@"
+}
 
 PIDS=()
 PASSED=0
@@ -102,7 +107,7 @@ wait_for_url() {
 
 start_agent() {
     local script="$1"
-    AGENTFIELD_URL="$AF_URL" python3 "$script" >/dev/null 2>&1 &
+    AGENTFIELD_URL="$AF_URL" AGENTFIELD_API_KEY="$E2E_API_KEY" python3 "$script" >/dev/null 2>&1 &
     local pid=$!
     PIDS+=($pid)
     echo $pid
@@ -131,6 +136,7 @@ if [[ "${1:-}" != "--skip-setup" ]]; then
 
     log "Starting control plane on port $AF_PORT..."
     AGENTFIELD_PORT="$AF_PORT" \
+    AGENTFIELD_API_KEY="$E2E_API_KEY" \
     AGENTFIELD_LLM_HEALTH_ENABLED=true \
     AGENTFIELD_LLM_HEALTH_ENDPOINT="$MOCK_LLM_URL/health" \
     AGENTFIELD_LLM_HEALTH_ENDPOINT_NAME="mock-litellm" \
@@ -505,7 +511,7 @@ stream_exec_id=$(json_get "$exec_result" "execution_id")
 
 if [ "$stream_exec_id" != "null" ] && [ -n "$stream_exec_id" ]; then
     # Read SSE events for a few seconds
-    sse_output=$(timeout 5 curl -s -N "$AF_URL/api/ui/v1/executions/$stream_exec_id/logs/stream" 2>/dev/null || true)
+    sse_output=$(timeout 5 "$(command -v curl)" -s -N -H "X-API-Key: $E2E_API_KEY" "$AF_URL/api/ui/v1/executions/$stream_exec_id/logs/stream" 2>/dev/null || true)
 
     if echo "$sse_output" | grep -q "connected"; then
         pass "SSE log stream connects and sends initial event"

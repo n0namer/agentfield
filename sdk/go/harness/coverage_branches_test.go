@@ -274,6 +274,39 @@ func TestRunnerRetryAdditionalBranches(t *testing.T) {
 		assert.Equal(t, 3, attempts)
 	})
 
+	t.Run("handleSchemaWithRetry does not start first retry when parent is already cancelled", func(t *testing.T) {
+		dir := t.TempDir()
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		calls := 0
+		prov := &funcProvider{
+			fn: func(context.Context, string, Options) (*RawResult, error) {
+				calls++
+				return &RawResult{Result: "unexpected retry"}, nil
+			},
+		}
+
+		result := NewRunner(Options{}).handleSchemaWithRetry(
+			ctx,
+			&RawResult{Result: "bad first result"},
+			map[string]any{"properties": map[string]any{"value": map[string]any{"type": "string"}}},
+			&struct {
+				Value string `json:"value"`
+			}{},
+			dir,
+			time.Now(),
+			prov,
+			Options{SchemaMaxRetries: 2},
+			"prompt",
+			false,
+		)
+
+		assert.True(t, result.IsError)
+		assert.Equal(t, FailureTimeout, result.FailureType)
+		assert.Equal(t, 0, calls, "cancelled parent must not launch schema repair")
+		assert.Contains(t, result.ErrorMessage, "context cancelled during schema retry")
+	})
+
 	t.Run("handleSchemaWithRetry returns timeout when context is cancelled during retry delay", func(t *testing.T) {
 		dir := t.TempDir()
 		ctx, cancel := context.WithCancel(context.Background())

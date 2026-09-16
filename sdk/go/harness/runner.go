@@ -338,6 +338,9 @@ func (r *Runner) executeWithRetry(ctx context.Context, provider Provider, prompt
 			lastErr = err
 			if isTransient(err.Error()) && attempt < maxRetries {
 				sleepWithJitter(ctx, initialDelay, maxDelay, backoff, attempt)
+				if ctx.Err() != nil {
+					return nil, ctx.Err()
+				}
 				continue
 			}
 			return nil, err
@@ -350,6 +353,9 @@ func (r *Runner) executeWithRetry(ctx context.Context, provider Provider, prompt
 		errMsg := raw.ErrorMessage
 		if isTransient(errMsg) && attempt < maxRetries {
 			sleepWithJitter(ctx, initialDelay, maxDelay, backoff, attempt)
+			if ctx.Err() != nil {
+				return raw, ctx.Err()
+			}
 			continue
 		}
 		return raw, nil
@@ -462,6 +468,23 @@ func (r *Runner) handleSchemaWithRetry(
 	lastSessionID := initialRaw.Metrics.SessionID
 
 	for retryNum := 0; retryNum < maxRetries; retryNum++ {
+		if ctx.Err() != nil {
+			elapsed := int(time.Since(startTime).Milliseconds())
+			cost, turns, sid, msgs, tok := accumulateMetrics(allRaws)
+			res := &Result{
+				IsError:      true,
+				ErrorMessage: "context cancelled during schema retry",
+				FailureType:  FailureTimeout,
+				CostUSD:      cost,
+				NumTurns:     turns,
+				DurationMS:   elapsed,
+				SessionID:    sid,
+				Model:        firstMetricsModel(allRaws),
+				Messages:     msgs,
+			}
+			tok.applyTo(res)
+			return res
+		}
 		if retryNum > 0 {
 			delay := math.Min(0.5*math.Pow(2, float64(retryNum-1)), 5.0)
 			timer := time.NewTimer(time.Duration(delay * float64(time.Second)))

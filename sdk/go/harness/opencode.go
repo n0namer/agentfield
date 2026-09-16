@@ -61,10 +61,13 @@ func NewOpenCodeProvider(binPath, serverURL string) *OpenCodeProvider {
 	if serverURL == "" {
 		serverURL = os.Getenv("OPENCODE_SERVER")
 	}
-	return &OpenCodeProvider{BinPath: binPath, ServerURL: serverURL, runCLI: RunCLIWithStdin}
+	runOpenCodeCLI := func(ctx context.Context, cmd []string, env map[string]string, cwd string, timeout int, stdin []byte) (*CLIResult, error) {
+		return runCLIWithStdinIdle(ctx, cmd, env, cwd, timeout, 0, stdin)
+	}
+	return &OpenCodeProvider{BinPath: binPath, ServerURL: serverURL, runCLI: runOpenCodeCLI}
 }
 
-func watchStableSchemaOutput(ctx context.Context, outputDir string, cancel context.CancelFunc) {
+func watchStableCompleteSchemaOutput(ctx context.Context, outputDir string, cancel context.CancelFunc, completed chan<- struct{}) {
 	if outputDir == "" {
 		return
 	}
@@ -90,6 +93,12 @@ func watchStableSchemaOutput(ctx context.Context, outputDir string, cancel conte
 				stableReads = 0
 				continue
 			}
+			isComplete, ok := object["complete"].(bool)
+			if !ok || !isComplete {
+				last = ""
+				stableReads = 0
+				continue
+			}
 			current := string(data)
 			if current == last {
 				stableReads++
@@ -98,6 +107,10 @@ func watchStableSchemaOutput(ctx context.Context, outputDir string, cancel conte
 				stableReads = 1
 			}
 			if stableReads >= 3 {
+				select {
+				case completed <- struct{}{}:
+				default:
+				}
 				cancel()
 				return
 			}
@@ -218,16 +231,26 @@ func (p *OpenCodeProvider) Execute(ctx context.Context, prompt string, options O
 
 	cliCtx := ctx
 	stopCLIWatch := func() {}
+	completed := make(chan struct{}, 1)
 	if options.schemaOutputDir != "" {
-		var cancel context.CancelFunc
-		cliCtx, cancel = context.WithCancel(ctx)
-		stopCLIWatch = cancel
-		go watchStableSchemaOutput(cliCtx, options.schemaOutputDir, cancel)
+		var cancelCLI context.CancelFunc
+		cliCtx, cancelCLI = context.WithCancel(ctx)
+		stopCLIWatch = cancelCLI
+		go watchStableCompleteSchemaOutput(cliCtx, options.schemaOutputDir, cancelCLI, completed)
 	}
 	defer stopCLIWatch()
 
 	cliResult, err := p.runCLI(cliCtx, cmd, env, options.Cwd, options.timeout(), stdinPrompt)
 	apiMS := int(time.Since(startAPI).Milliseconds())
+	semanticComplete := false
+	select {
+	case <-completed:
+		semanticComplete = true
+	default:
+	}
+	if semanticComplete && ctx.Err() == nil {
+		return &RawResult{Metrics: Metrics{DurationAPIMS: apiMS}, ReturnCode: 0}, nil
+	}
 
 	if err != nil {
 		// Check if it's a "not found" error
