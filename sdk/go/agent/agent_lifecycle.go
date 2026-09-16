@@ -391,6 +391,20 @@ func (a *Agent) shutdownWithOptions(ctx context.Context, graceful bool, timeout 
 	})
 	a.stopLeaseOnce.Do(func() { close(a.stopLease) })
 
+	// Stop all in-flight reasoners before the HTTP server begins its bounded
+	// shutdown window. Context-aware subprocesses (for example OpenCode) then
+	// receive cancellation instead of surviving as orphan mutators. Keep their
+	// tracking entries until settlement accounting completes, then clear any
+	// leftovers before shutdown returns.
+	a.cancelAllExecutions()
+	defer a.clearExecutionCancellations()
+
+	// Unblock any reasoner still parked in Agent.Pause() so shutdown does not
+	// hang waiting on an approval callback that will never arrive.
+	if a.pauseManager != nil {
+		a.pauseManager.CancelAll()
+	}
+
 	if a.client != nil {
 		if _, err := a.client.Shutdown(ctx, a.cfg.NodeID, types.ShutdownRequest{Reason: "shutdown", Version: a.cfg.Version}); err != nil {
 			a.logger.Printf("failed to notify shutdown: %v", err)
