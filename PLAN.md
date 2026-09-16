@@ -401,11 +401,16 @@ Use raw dimensions; do not collapse them into one opaque score until decision we
 10. repeatability across equivalent/paraphrased fixtures for critical nondeterministic flows.
 
 ### Pareto execution strategy — 30-minute batches
-**Batch G1 — inventory + traceability (P0/P1 only).**
-- Machine-enumerate reasoners, entrypoints, config flags, roles and existing regression tests from CURRENT SWE source.
-- Fill `TECH evidence` status for each P0/P1 matrix row as `PASS | GAP | BLOCKED | NOT-RUN`; do not infer from source existence.
-- Run existing deterministic unit/component suites needed to close cheap gaps; no LLM-heavy E2E yet.
-- DoD: 100% of P0/P1 rows have an owner, activation path, oracle, and current evidence status.
+**Batch G1 — inventory + traceability (P0/P1 only) — DONE (2026-09-16).**
+- CURRENT runtime discovery proves `swe-planner` active/ready at health 100 with exactly 31 registered reasoners: public/orchestrator surface `build`, `execute`, `implement_issue`, `plan`, `resolve`, `resume_build`; planning roles (`run_product_manager`, `run_environment_scout`, `run_architect`, `run_tech_lead`, `run_sprint_planner`); coding/review (`run_coder`, `run_qa`, `run_code_reviewer`, `run_qa_synthesizer`); advisor/verification (`run_retry_advisor`, `run_issue_advisor`, `run_replanner`, `run_issue_writer`, `run_verifier`, `generate_fix_issues`); integration/git/CI (`run_integration_tester`, `run_git_init`, `run_repo_finalize`, `run_merger`, `run_github_pr`, `run_ci_watcher`, `run_ci_fixer`, `run_pr_resolver`); workspace setup/cleanup.
+- CURRENT config inventory proves explicit controls for runtime/model routing, coding/review/verify/retry/replan budgets, advisor invocation cap, integration-testing retries, concurrency, CI-fix cycles, learning, GitHub PR, `resume_build_id`, and declared `files_to_create/files_to_modify` scope.
+- Cheap deterministic package gates on the live SWE checkout are GREEN: `internal/node` discovery/registration tests; `internal/config` + `internal/runtimex`; `internal/dagutil` + `internal/dag`; `internal/issue`; `internal/coding` + `internal/roles/coding`; `internal/roles/planning`; `internal/roles/advisor`; `internal/roles/gitops`; `internal/roles/ci` + `internal/cigate`; `internal/prompts/coding`.
+- P0/P1 traceability status after G1:
+  - `PASS/component + prior runtime evidence`: discovery/entrypoints, runtime/model routing, coder loop, verifier, scope/hygiene, recovery/resume.
+  - `PASS/component; runtime activation still required in G2/G3`: DAG execution, code-review repair loop, planning roles beyond the prior product-manager smoke, issue/retry advisor, replanning, integration testing, parallel execution, failure thresholds.
+  - `PARTIAL/runtime hardening evidence`: cancellation/termination and structured-output completion have fresh AgentField regressions/runtime observations but current live AgentField source contains uncanonicalized hardening deltas; do not call the generation canonically closed yet.
+- Source-state caveat is explicit: SWE `HEAD=.source-commit=0660fb8921f63b0a6ba58254124774068b92fe10` with dirty `go/internal/dag/executor_test.go`; AgentField `HEAD=.source-commit=26841718c42d2a7fb9008014f4a1d552f945bac6` with current live hardening deltas in harness/agent/E2E files. Runtime evidence is valid for behavior observed, but canonical-source completion remains separate.
+- DoD met: every P0/P1 matrix row now has an owner/surface, activation path, deterministic oracle, and current evidence status. Remaining work is runtime/E2E activation and quality, not inventory discovery.
 
 **Batch G2 — P0 technical E2E.**
 - One compact fixture pack covering discovery/routing, coder/reviewer/verifier, scope/hygiene, structured output, resume, cancellation and zero-orphan termination.
