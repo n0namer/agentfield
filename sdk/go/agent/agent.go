@@ -2030,7 +2030,48 @@ func (a *Agent) Call(ctx context.Context, target string, input map[string]any) (
 		runID = submittedRunID
 	}
 
-	return a.awaitExecutionResult(ctx, base, target, executionID, runID, execCtx)
+	result, err := a.awaitExecutionResult(ctx, base, target, executionID, runID, execCtx)
+	if err != nil && ctx.Err() != nil {
+		a.cancelSubmittedExecution(base, executionID, runID, execCtx)
+	}
+	return result, err
+}
+
+func (a *Agent) cancelSubmittedExecution(base, executionID, runID string, execCtx ExecutionContext) {
+	cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cancelURL := fmt.Sprintf("%s/api/v1/executions/%s/cancel", base, url.PathEscape(executionID))
+	req, err := http.NewRequestWithContext(cleanupCtx, http.MethodPost, cancelURL, nil)
+	if err != nil {
+		a.logExecutionWarn(cleanupCtx, "call.outbound.cancel_failed", "failed to build child cancellation request", map[string]any{
+			"execution_id": executionID,
+			"error":        err.Error(),
+		})
+		return
+	}
+	a.applyCallHeaders(req, execCtx, runID)
+	if a.client != nil {
+		a.client.SignHTTPRequest(req, nil)
+	}
+	resp, err := a.callSubmitClient.Do(req)
+	if err != nil {
+		a.logExecutionWarn(cleanupCtx, "call.outbound.cancel_failed", "failed to propagate child cancellation", map[string]any{
+			"execution_id": executionID,
+			"error":        err.Error(),
+		})
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		a.logExecutionWarn(cleanupCtx, "call.outbound.cancel_failed", "child cancellation returned non-success status", map[string]any{
+			"execution_id": executionID,
+			"status_code":  resp.StatusCode,
+		})
+		return
+	}
+	a.logExecutionInfo(cleanupCtx, "call.outbound.cancelled", "propagated cancellation to child execution", map[string]any{
+		"execution_id": executionID,
+	})
 }
 
 // applyCallHeaders sets the execution-context lineage headers shared by the
