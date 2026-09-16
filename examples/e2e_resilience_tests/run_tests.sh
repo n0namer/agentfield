@@ -107,7 +107,7 @@ wait_for_url() {
 
 start_agent() {
     local script="$1"
-    AGENTFIELD_URL="$AF_URL" python3 "$script" >/dev/null 2>&1 &
+    AGENTFIELD_URL="$AF_URL" AGENTFIELD_API_KEY="$E2E_API_KEY" python3 "$script" >/dev/null 2>&1 &
     local pid=$!
     PIDS+=($pid)
     echo $pid
