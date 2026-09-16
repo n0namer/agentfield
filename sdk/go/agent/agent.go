@@ -666,8 +666,14 @@ func New(cfg Config) (*Agent, error) {
 		}
 	}
 
+	instanceID, err := newAgentInstanceID()
+	if err != nil {
+		return nil, err
+	}
+
 	a := &Agent{
 		cfg:                         cfg,
+		instanceID:                  instanceID,
 		httpClient:                  httpClient,
 		callSubmitClient:            callSubmitClient,
 		callPollClient:              callPollClient,
