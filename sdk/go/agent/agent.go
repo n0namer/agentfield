@@ -529,6 +529,7 @@ type CLIConfig struct {
 // Agent manages registration, lease renewal, and HTTP routing.
 type Agent struct {
 	cfg        Config
+	instanceID string
 	client     *client.Client
 	httpClient *http.Client
 
