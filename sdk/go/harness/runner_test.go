@@ -446,6 +446,23 @@ func TestOpenCodeProvider_SuccessfulExecution(t *testing.T) {
 	assert.Contains(t, raw.Result, "Hello from opencode")
 }
 
+func TestOpenCodeProvider_DoesNotUseGenericIdleWatchdog(t *testing.T) {
+	dir := t.TempDir()
+	script := writeTestScript(t, dir, "opencode", "#!/bin/sh\nsleep 2\necho 'completed after quiet reasoning'\n")
+	t.Setenv("AGENTFIELD_HARNESS_IDLE_SECONDS", "1")
+
+	p := NewOpenCodeProvider(script, "")
+	started := time.Now()
+	raw, err := p.Execute(context.Background(), "test prompt", Options{Timeout: 5})
+	elapsed := time.Since(started)
+
+	require.NoError(t, err)
+	require.NotNil(t, raw)
+	assert.False(t, raw.IsError, raw.ErrorMessage)
+	assert.Contains(t, raw.Result, "completed after quiet reasoning")
+	assert.GreaterOrEqual(t, elapsed, 2*time.Second)
+}
+
 func TestClaudeCodeProvider_SuccessfulExecution(t *testing.T) {
 	dir := t.TempDir()
 	// Create a fake claude binary that outputs JSON
