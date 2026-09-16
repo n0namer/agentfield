@@ -313,6 +313,26 @@ func TestRunnerHelperBranches(t *testing.T) {
 		assert.Equal(t, FailureAPIError, raw.FailureType)
 	})
 
+	t.Run("executeWithRetry does not retry after parent cancellation", func(t *testing.T) {
+		runner := NewRunner(Options{})
+		ctx, cancel := context.WithCancel(context.Background())
+		calls := 0
+		prov := &funcProvider{
+			fn: func(context.Context, string, Options) (*RawResult, error) {
+				calls++
+				if calls == 1 {
+					cancel()
+					return nil, fmt.Errorf("connection reset by peer")
+				}
+				return &RawResult{Result: "unexpected retry"}, nil
+			},
+		}
+
+		_, err := runner.executeWithRetry(ctx, prov, "prompt", Options{MaxRetries: 2, InitialDelay: 0.01})
+		require.Error(t, err)
+		assert.Equal(t, 1, calls, "cancelled parent must not launch another provider attempt")
+	})
+
 	t.Run("handleSchemaWithRetry returns provider failure when output file is absent and failure is non-retryable", func(t *testing.T) {
 		runner := NewRunner(Options{})
 		result := runner.handleSchemaWithRetry(
