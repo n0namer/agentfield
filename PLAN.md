@@ -323,7 +323,115 @@ Apply this same contract to every existing project; do not redesign SourceLoop p
 Universal onboarding DoD: canonical owner known; runtime root known; exact base known; binding/captures proven; project validators defined; two durable patches pass capture→exact-base→canonical reread; formal capture→commit linkage exists; active ordered patch stack is reconstructable; upstream owner is known; release snapshot is expressible as an exact commit. Missing any item means PARTIAL/BLOCKED, never GREEN.
 
 ## Current Phase Goal
-Initial SWE Quality Acceptance is CLOSED on the existing AgentField container stack. Continue container-first operational hardening on the accepted classic `swe-planner` path: keep `swe-planner` active/ready with canonical SDK provenance, preserve the accepted `broker/fast-coding` + OpenCode runtime contract, enforce scope/junk hygiene, and reduce avoidable coder/reviewer/verifier latency without weakening verification. No PR/deploy/redeploy/CI is part of this phase.
+Run a **BMAD-managed SWE Capability & Quality Verification phase** on the current container-first DEV stack. The goal is no longer a small acceptance sample: build traceability from every material SWE capability to activation/runtime evidence, deterministic technical tests, failure/recovery behavior, and a separate quality evaluation. Technical correctness is gated before quality scoring. The accepted classic path remains `swe-planner` + `open_code` + `broker/fast-coding`; no PR/deploy/redeploy/release CI is part of this phase.
+
+### BMAD test-design mode and decision
+- Entry contract: canonical `BMAD-MNNZ` `bmad-help`; project SoT remains this `PLAN.md` in `n0namer/agentfield`.
+- Specialized workflow: `bmad-testarch-test-design`, **System-Level Mode** because the subject is the whole SWE execution system, not one story/epic.
+- BMAD outputs are folded into this existing SoT instead of creating parallel `test-design-*.md` files; project instruction against duplicate owners overrides generic output-path defaults.
+- Evidence order: CURRENT source/runtime -> deterministic tests/readback -> trace/trajectory evidence -> seeded-fault/metamorphic quality evidence -> LLM judge only for genuinely subjective artifacts.
+
+### Testability assessment
+**Strengths**
+- High controllability: config exposes runtime/model selection, bounded retries/replans/coding/review/CI-fix cycles, concurrency, advisor, integration testing, verification, `resume_build_id`, and declared file scope.
+- High observability at technical level: execution IDs/run IDs, worktrees/branches/commits, structured output, planner/control-plane status, package tests, SourceLoop provenance, and process/readback inspection.
+- Strong deterministic regression base already exists for resume, scope, cancellation-after-commit, verifier failure, blocking review, DAG/replan behavior, advisor budgets, verifier parsing, CI watcher/fixer, runtime mapping, and discovery surface.
+
+**Actionable concerns / ASRs**
+- ASR-1 ACTIONABLE: feature inventory is not yet tied to one traceability matrix; a feature can be implemented/unit-tested but not proven enabled/reachable in CURRENT runtime.
+- ASR-2 ACTIONABLE: final task PASS can hide bad trajectory/tool ordering, duplicate work, excessive repair, or dormant feature flags; trajectory correctness needs its own gate.
+- ASR-3 ACTIONABLE: quality benefit of advisor/replanning/verifier/integration testing is not yet measured against feature-OFF baselines.
+- ASR-4 ACTIONABLE: long-running `fast-coding` makes 75s/300s synthetic cutoffs invalid for quality conclusions; acceptance budgets must distinguish time-to-first-useful-effect from total turn time and remain bounded.
+- ASR-5 ACTIONABLE: interaction coverage is incomplete for combinations such as advisor+replan, parallel DAG+failure threshold, verifier+repair, and cancel+active child/tool call.
+- ASR-6 FYI: release/PR/GitHub-specific flows exist but remain outside the current inner-loop phase unless they block a core SWE contract.
+
+### Risk register (BMAD probability × impact)
+| ID | Category | Risk | P | I | Score | Mitigation / evidence |
+|---|---|---|---:|---:|---:|---|
+| R1 | TECH | Capability exists in source but is disabled/unreachable in live planner | 3 | 3 | 9 | runtime discovery + activation canary per P0/P1 capability |
+| R2 | OPS | Parent/root termination leaves active child/tool/model work | 2 | 3 | 6 | cancellation E2E + zero-orphan readback; existing AgentField regressions retained |
+| R3 | TECH | Recovery/retry repeats an already-observed mutation | 2 | 3 | 6 | resume/ambiguous-effect canaries; duplicate-action rate hard gate = 0 |
+| R4 | TECH | Reviewer/verifier technically runs but misses planted defects | 2 | 3 | 6 | seeded-fault detection pack with deterministic oracle |
+| R5 | TECH | Scope/DAG/replanning widens work beyond declared intent | 2 | 3 | 6 | exact diff/scope oracle + DAG invariants + replan interaction tests |
+| R6 | PERF | Slow model is misclassified as hung or consumes budget without useful effect | 3 | 2 | 6 | record time-to-first-effect, stage wall time, retry count; bounded realistic budgets |
+| R7 | OPS | Parallel issues conflict or failure threshold wastes downstream work | 2 | 3 | 6 | bounded concurrency fixture + level-failure threshold assertions |
+| R8 | TECH | Feature ON adds latency/cost but no measurable quality benefit | 3 | 2 | 6 | paired OFF/ON quality tasks for advisor/replan/verifier/integration testing |
+| R9 | TECH | Structured-output/schema recovery loses satisfied fields or triggers premature completion | 2 | 3 | 6 | incremental-output/golden regressions + full public Runner path |
+| R10 | OPS | Test fixture/environment failure is mistaken for product failure | 2 | 2 | 4 | differential clean-baseline reproduction and explicit VALIDATION_BLOCKER classification |
+
+### SWE capability verification matrix v1
+Verdicts start `PLANNED` unless prior evidence listed in Batch E/F or CURRENT tests explicitly closes them. Each row requires separate **TECH** and **QUALITY** evidence; QUALITY is never inferred from TECH PASS.
+
+| Capability family | CURRENT surface / examples | Priority | TECH oracle | QUALITY oracle |
+|---|---|---|---|---|
+| Discovery & entrypoints | planner 31 reasoners; `plan/build/execute/resolve/resume_build/implement_issue`; fast surface | P0 | exact discovery names, schemas, direct invocation | correct entrypoint chosen; no hidden/dormant path |
+| Runtime/model routing | runtime normalization, role models, `open_code`, broker routes | P0 | resolved provider/model equals config; unsupported route fails closed | success, time-to-first-effect, wall time, cost by role |
+| Planning roles | product manager, architect, tech lead, sprint planner | P1 | role reachable; schema/output valid | decomposition completeness, dependency correctness, actionable scope |
+| DAG execution | levels, dependencies, parallel same-level work | P0 | deterministic ordering/concurrency invariants | no premature work; throughput gain without conflicts/rework |
+| Coder loop | bounded coding iterations, nested module CWD, tests/commit | P0 | mutation/test/commit contract | correctness, minimal diff, repair efficiency |
+| Code review | blocking/non-blocking review, bounded review repair | P0 | reject/fix/accept loop obeys budget | seeded-fault detection and false-positive rate |
+| Verifier | independent verification and verify-fix cycles | P0 | verifier actually runs and can fail build | planted-fault detection; no rubber-stamp approvals |
+| Scope & hygiene | files_to_modify/create, junk scrub, worktree cleanup | P0 | out-of-scope/junk fails closed | scope precision = 1.0 on strict fixtures |
+| Recovery/resume | `resume_build_id`, preserved branch/worktree/commit | P0 | same build/worktree reused | lost-work=0, duplicate mutation=0 |
+| Cancellation/termination | root→child cancellation, provider/schema retry guards | P0 | zero active child/orphan after terminal cancel/timeout | post-cancel mutation=0; wasted-call rate=0 |
+| Structured output | incremental schema, postcondition recovery | P0 | no premature `{}` completion; satisfied fields preserved | repair count; preserved-field accuracy; no duplicate effects |
+| Issue advisor | `enable_issue_advisor`, `max_advisor_invocations` | P1 | correct trigger and invocation cap | OFF/ON recovery gain vs added latency/cost |
+| Replanning | `enable_replanning`, `max_replans`, DAG apply/reject-cycle | P1 | correct trigger/action mapping and bounded replan | OFF/ON recovery gain; no unnecessary scope widening |
+| Integration testing | `enable_integration_testing`, retry budget | P1 | stage invoked under required conditions | catches cross-component seeded faults missed by unit tests |
+| Retry advisor | retry classification/advice | P1 | reachable, bounded, fatal/fallback semantics | fewer futile repeats / better recovery efficiency |
+| CI watcher/fixer | watcher, fixer, `max_ci_fix_cycles` | P2 | polling cancel, bounded fix cycles, parse/fatal paths | seeded CI failure repair precision |
+| Parallel execution | `max_concurrent_issues` | P1 | concurrency cap and dependency safety | wall-time reduction without conflict/error increase |
+| Failure thresholds | DAG level failure threshold, retry budgets | P1 | aborts downstream at defined boundary | wasted coder/reviewer calls reduced |
+| Fast build surface | fast plan/execute/verify, `max_tasks` | P2 | discovery/config/flow contract | quality/latency delta vs classic on small bounded tasks |
+| Pro/Furrow engine | Pro registration/engine path | P2 | discover/execute in isolated acceptance | compare outcome/latency/cost only after classic P0/P1 GREEN |
+| Learning | `enable_learning` | P3/HOLD | prove explicit contract before enabling | no quality score until owner/expected effect is defined |
+| GitHub PR/release flows | GitHub PR, merge, CI resolver | P3/currently out-of-phase | defer to release boundary | defer |
+
+### Quality scorecard (after technical gate)
+Use raw dimensions; do not collapse them into one opaque score until decision weights exist.
+1. task success and independent-test pass rate;
+2. scope precision / unrelated-file count;
+3. seeded-fault detection rate and reviewer/verifier false-positive rate;
+4. repair efficiency = successful repairs / repair attempts;
+5. duplicate-action rate and post-cancel mutation count (hard zero gates);
+6. trajectory violations: wrong ordering/tool/arguments/budget breaches;
+7. time-to-first-useful-effect and end-to-end wall time;
+8. model/provider cost where available;
+9. plan/decomposition quality for subjective planning artifacts, judged only after deterministic checks;
+10. repeatability across equivalent/paraphrased fixtures for critical nondeterministic flows.
+
+### Pareto execution strategy — 30-minute batches
+**Batch G1 — inventory + traceability (P0/P1 only).**
+- Machine-enumerate reasoners, entrypoints, config flags, roles and existing regression tests from CURRENT SWE source.
+- Fill `TECH evidence` status for each P0/P1 matrix row as `PASS | GAP | BLOCKED | NOT-RUN`; do not infer from source existence.
+- Run existing deterministic unit/component suites needed to close cheap gaps; no LLM-heavy E2E yet.
+- DoD: 100% of P0/P1 rows have an owner, activation path, oracle, and current evidence status.
+
+**Batch G2 — P0 technical E2E.**
+- One compact fixture pack covering discovery/routing, coder/reviewer/verifier, scope/hygiene, structured output, resume, cancellation and zero-orphan termination.
+- Reuse the same fixtures across mechanisms; avoid duplicate E2E coverage already proven at unit/component level.
+- DoD: P0 pass rate = 100%; duplicate mutation=0; orphan child/process=0; strict-scope violations=0.
+
+**Batch G3 — P1 orchestration technical E2E.**
+- Exercise advisor, replanning, integration testing, parallel DAG and failure-threshold interactions with fault injection.
+- DoD: P1 technical pass rate >=95%; every high-risk R1–R9 has direct evidence or an explicit blocker.
+
+**Batch G4 — quality A/B pack.**
+- 12–15 verified repository-shaped tasks: one-file bug, logic bug, missing-test gap, bounded cross-file, DAG/dependency, ambiguous issue, advisor-needed, replan-needed, integration fault, reviewer seeded fault, verifier seeded fault, pre/post-mutation interruption, transient provider failure, explicit scope temptation.
+- For advisor/replan/verifier/integration testing run paired OFF/ON comparisons where meaningful; critical nondeterministic scenarios get repeated runs only after deterministic TECH PASS.
+- DoD: quality scorecard populated with raw measurements and confidence/replicate count; no quality claim from a single anecdotal success.
+
+**Batch G5 — long tail only after core GREEN.**
+- Fast mode, Pro/Furrow, learning and release-boundary/GitHub paths.
+- DoD: each is either TECH/QUALITY evidenced or explicitly HOLD/DEFER with owner and reason; no silent untested feature.
+
+### Phase quality gates
+- P0 TECH pass rate = **100%**.
+- P1 TECH pass rate = **>=95%**, with no unresolved score>=6 risk allowed to masquerade as GREEN.
+- P0/P1 traceability coverage = **100%** for `{feature -> activation -> test level -> evidence -> verdict}`.
+- Duplicate irreversible mutation = **0**; orphan child/process after terminal parent = **0**; silent strict-scope widening = **0**.
+- High-risk mitigation evidence exists before declaring the capability-verification phase complete.
+- QUALITY is reported dimension-by-dimension and feature OFF/ON deltas are shown where applicable; unknown NFR thresholds remain `UNKNOWN`, never guessed.
 
 ## Bounded 30-minute batches
 ### Batch A — exact-source RED readiness — DONE (2026-09-14)
