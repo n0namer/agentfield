@@ -77,7 +77,7 @@ func TestRunner_MergeOptions(t *testing.T) {
 	assert.Equal(t, "2", merged.Env["B"])
 }
 
-func TestRunner_OpenCodeReturnsWhenDurableSchemaOutputIsReady(t *testing.T) {
+func TestRunner_OpenCodeDoesNotStopAtInitialEmptyIncrementalObject(t *testing.T) {
 	dir := t.TempDir()
 	script := filepath.Join(dir, "opencode")
 	body := `#!/bin/sh
@@ -86,8 +86,9 @@ for arg do last="$arg"; done
 output_path=$(printf '%s' "$last" | tr '\n' ' ' | sed -n 's/.*create this file: \([^ ]*\.agentfield_output\.json\).*/\1/p')
 [ -n "$output_path" ] || exit 12
 mkdir -p "$(dirname "$output_path")"
+printf '%s\n' '{}' > "$output_path"
+sleep 0.35
 printf '%s\n' '{"status":"ok"}' > "$output_path"
-sleep 5
 `
 	require.NoError(t, os.WriteFile(script, []byte(body), 0o755))
 
@@ -117,8 +118,56 @@ sleep 5
 	require.NotNil(t, result)
 	assert.False(t, result.IsError, result.ErrorMessage)
 	assert.Equal(t, "ok", dest.Status)
+	if elapsed < 300*time.Millisecond {
+		t.Fatalf("runner returned after %s; initial {} must not terminate incremental OpenCode output", elapsed)
+	}
+}
+
+func TestRunner_OpenCodeReturnsAfterStableCompleteMarker(t *testing.T) {
+	dir := t.TempDir()
+	script := filepath.Join(dir, "opencode")
+	body := `#!/bin/sh
+last=""
+for arg do last="$arg"; done
+output_path=$(printf '%s' "$last" | tr '\n' ' ' | sed -n 's/.*create this file: \([^ ]*\.agentfield_output\.json\).*/\1/p')
+[ -n "$output_path" ] || exit 12
+mkdir -p "$(dirname "$output_path")"
+printf '%s\n' '{"status":"ok","complete":true}' > "$output_path"
+sleep 5
+`
+	require.NoError(t, os.WriteFile(script, []byte(body), 0o755))
+
+	type output struct {
+		Status   string `json:"status"`
+		Complete bool   `json:"complete"`
+	}
+	schema := map[string]any{
+		"type":     "object",
+		"required": []any{"status", "complete"},
+		"properties": map[string]any{
+			"status":   map[string]any{"type": "string"},
+			"complete": map[string]any{"type": "boolean"},
+		},
+	}
+
+	runner := NewRunner(Options{
+		Provider:   ProviderOpenCode,
+		BinPath:    script,
+		ProjectDir: dir,
+		Cwd:        dir,
+		Timeout:    2,
+	})
+	var dest output
+	started := time.Now()
+	result, err := runner.Run(context.Background(), "produce complete status", schema, &dest, Options{})
+	elapsed := time.Since(started)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.False(t, result.IsError, result.ErrorMessage)
+	assert.Equal(t, "ok", dest.Status)
+	assert.True(t, dest.Complete)
 	if elapsed >= 1500*time.Millisecond {
-		t.Fatalf("runner waited %s after durable schema output was ready; want <1.5s", elapsed)
+		t.Fatalf("runner waited %s after stable complete=true output; want <1.5s", elapsed)
 	}
 }
 
