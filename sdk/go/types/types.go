@@ -55,6 +55,7 @@ type CommunicationConfig struct {
 // NodeRegistrationRequest is the legacy-compatible registration payload.
 type NodeRegistrationRequest struct {
 	ID                   string               `json:"id"`
+	InstanceID           string               `json:"instance_id,omitempty"`
 	TeamID               string               `json:"team_id"`
 	BaseURL              string               `json:"base_url"`
 	Version              string               `json:"version"`
