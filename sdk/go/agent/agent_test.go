@@ -833,9 +833,9 @@ func TestCall_OutlivesCallTimeout(t *testing.T) {
 }
 
 // TestCall_CtxCancelAbortsWait: cancelling the caller's ctx aborts the wait
-// loop promptly (returning the context error). Note the contract: the child
-// execution is NOT cancelled server-side — matching the Python SDK.
+// promptly and propagates cancellation to the submitted child execution.
 func TestCall_CtxCancelAbortsWait(t *testing.T) {
+	childCancelled := make(chan struct{}, 1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/api/v1/execute/async/"):
@@ -845,8 +845,14 @@ func TestCall_CtxCancelAbortsWait(t *testing.T) {
 				"run_id":       "run-hang",
 				"status":       "queued",
 			})
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/executions/exec-hang/cancel":
+			select {
+			case childCancelled <- struct{}{}:
+			default:
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "cancelled"})
 		case r.Method == http.MethodGet:
-			// Child never finishes.
+			// Child never finishes unless the caller propagates cancellation.
 			_ = json.NewEncoder(w).Encode(map[string]any{"status": "running"})
 		default:
 			w.WriteHeader(http.StatusNotFound)
