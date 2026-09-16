@@ -77,7 +77,7 @@ func TestRunner_MergeOptions(t *testing.T) {
 	assert.Equal(t, "2", merged.Env["B"])
 }
 
-func TestRunner_OpenCodeReturnsWhenDurableSchemaOutputIsReady(t *testing.T) {
+func TestRunner_OpenCodeDoesNotStopAtInitialEmptyIncrementalObject(t *testing.T) {
 	dir := t.TempDir()
 	script := filepath.Join(dir, "opencode")
 	body := `#!/bin/sh
@@ -86,8 +86,9 @@ for arg do last="$arg"; done
 output_path=$(printf '%s' "$last" | tr '\n' ' ' | sed -n 's/.*create this file: \([^ ]*\.agentfield_output\.json\).*/\1/p')
 [ -n "$output_path" ] || exit 12
 mkdir -p "$(dirname "$output_path")"
+printf '%s\n' '{}' > "$output_path"
+sleep 0.35
 printf '%s\n' '{"status":"ok"}' > "$output_path"
-sleep 5
 `
 	require.NoError(t, os.WriteFile(script, []byte(body), 0o755))
 
@@ -117,8 +118,8 @@ sleep 5
 	require.NotNil(t, result)
 	assert.False(t, result.IsError, result.ErrorMessage)
 	assert.Equal(t, "ok", dest.Status)
-	if elapsed >= 1500*time.Millisecond {
-		t.Fatalf("runner waited %s after durable schema output was ready; want <1.5s", elapsed)
+	if elapsed < 300*time.Millisecond {
+		t.Fatalf("runner returned after %s; initial {} must not terminate incremental OpenCode output", elapsed)
 	}
 }
 
@@ -395,6 +396,23 @@ func TestOpenCodeProvider_SuccessfulExecution(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, raw.IsError)
 	assert.Contains(t, raw.Result, "Hello from opencode")
+}
+
+func TestOpenCodeProvider_DoesNotUseGenericIdleWatchdog(t *testing.T) {
+	dir := t.TempDir()
+	script := writeTestScript(t, dir, "opencode", "#!/bin/sh\nsleep 2\necho 'completed after quiet reasoning'\n")
+	t.Setenv("AGENTFIELD_HARNESS_IDLE_SECONDS", "1")
+
+	p := NewOpenCodeProvider(script, "")
+	started := time.Now()
+	raw, err := p.Execute(context.Background(), "test prompt", Options{Timeout: 5})
+	elapsed := time.Since(started)
+
+	require.NoError(t, err)
+	require.NotNil(t, raw)
+	assert.False(t, raw.IsError, raw.ErrorMessage)
+	assert.Contains(t, raw.Result, "completed after quiet reasoning")
+	assert.GreaterOrEqual(t, elapsed, 2*time.Second)
 }
 
 func TestClaudeCodeProvider_SuccessfulExecution(t *testing.T) {
