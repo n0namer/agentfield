@@ -161,12 +161,13 @@ func (a *Agent) registerNode(ctx context.Context) error {
 	}
 
 	payload := types.NodeRegistrationRequest{
-		ID:        a.cfg.NodeID,
-		TeamID:    a.cfg.TeamID,
-		BaseURL:   strings.TrimSuffix(a.cfg.PublicURL, "/"),
-		Version:   a.cfg.Version,
-		Reasoners: reasoners,
-		Skills:    skills,
+		ID:         a.cfg.NodeID,
+		InstanceID: a.instanceID,
+		TeamID:     a.cfg.TeamID,
+		BaseURL:    strings.TrimSuffix(a.cfg.PublicURL, "/"),
+		Version:    a.cfg.Version,
+		Reasoners:  reasoners,
+		Skills:     skills,
 		CommunicationConfig: types.CommunicationConfig{
 			Protocols:         []string{"http"},
 			HeartbeatInterval: a.registeredHeartbeatInterval(),
