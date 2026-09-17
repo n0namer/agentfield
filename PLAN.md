@@ -485,7 +485,7 @@ DoD:
 - Preserve exact tested delta for SourceLoop/canonical publication when that lane is available.
 
 ## Method / anti-drift
-- BMAD current contract: `bmad-build` is the implementation loop (`bmad-quick-dev` is a compatibility shim). For this debugging/implementation phase use its lean shape only: observe/reproduce → isolate root cause → smallest scoped change → canonical validation → evidence-backed review. Do not add ceremony that does not improve a gate.
+- BMAD current contract: `bmad-help` routes the batch; `bmad-testarch-test-design` owns system-level risk/oracle design; `bmad-quick-dev` is the current canonical implementation workflow for a proven bounded source defect; `bmad-testarch-trace` closes requirement→test/evidence traceability. Use the lean implementation shape: observe/reproduce → isolate root cause → smallest scoped change → targeted validation → evidence-backed review. Do not add ceremony that does not improve a gate.
 - Systematic debugging skill: reproduce/observe before fixing; test one high-information hypothesis at a time; don't stack speculative fixes.
 - TDD skill: no product implementation before an observed failing test for the target behavior; RED must fail for the intended reason, then minimal GREEN.
 - Verification-before-completion: functional readback/test evidence, not tool acknowledgement or health alone, closes each guarantee.
