@@ -368,6 +368,16 @@ func ParseAndValidate(filePath string, dest any) (map[string]any, error) {
 		}
 	}
 
+	// Layer 3: extract a balanced JSON object from the raw file contents. This
+	// reuses the same strict text parser used for stdout fallback and recovers
+	// weak-model file-protocol mistakes such as a valid object followed by an
+	// extra trailing brace. Schema validation still runs in the caller.
+	if raw, readErr := os.ReadFile(filePath); readErr == nil {
+		if data, parseErr := TryParseFromText(string(raw), dest); parseErr == nil {
+			return data, nil
+		}
+	}
+
 	return nil, fmt.Errorf("parse and validate failed for %s", filePath)
 }
 

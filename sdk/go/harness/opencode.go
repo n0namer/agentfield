@@ -67,7 +67,7 @@ func NewOpenCodeProvider(binPath, serverURL string) *OpenCodeProvider {
 	return &OpenCodeProvider{BinPath: binPath, ServerURL: serverURL, runCLI: runOpenCodeCLI}
 }
 
-func watchStableCompleteSchemaOutput(ctx context.Context, outputDir string, cancel context.CancelFunc, completed chan<- struct{}) {
+func watchStableCompleteSchemaOutput(ctx context.Context, outputDir string, schema map[string]any, cancel context.CancelFunc, completed chan<- struct{}) {
 	if outputDir == "" {
 		return
 	}
@@ -76,6 +76,10 @@ func watchStableCompleteSchemaOutput(ctx context.Context, outputDir string, canc
 	defer ticker.Stop()
 	last := ""
 	stableReads := 0
+	requiresComplete := false
+	if properties, ok := schema["properties"].(map[string]any); ok {
+		_, requiresComplete = properties["complete"]
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -93,8 +97,14 @@ func watchStableCompleteSchemaOutput(ctx context.Context, outputDir string, canc
 				stableReads = 0
 				continue
 			}
-			isComplete, ok := object["complete"].(bool)
-			if !ok || !isComplete {
+			if requiresComplete {
+				isComplete, ok := object["complete"].(bool)
+				if !ok || !isComplete {
+					last = ""
+					stableReads = 0
+					continue
+				}
+			} else if err := validateAgainstSchema(object, schema); err != nil {
 				last = ""
 				stableReads = 0
 				continue
@@ -236,7 +246,7 @@ func (p *OpenCodeProvider) Execute(ctx context.Context, prompt string, options O
 		var cancelCLI context.CancelFunc
 		cliCtx, cancelCLI = context.WithCancel(ctx)
 		stopCLIWatch = cancelCLI
-		go watchStableCompleteSchemaOutput(cliCtx, options.schemaOutputDir, cancelCLI, completed)
+		go watchStableCompleteSchemaOutput(cliCtx, options.schemaOutputDir, options.schema, cancelCLI, completed)
 	}
 	defer stopCLIWatch()
 
