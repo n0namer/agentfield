@@ -202,7 +202,11 @@ func runCLIWithStdin(ctx context.Context, cmd []string, env map[string]string, c
 	// WaitDelay bounds that case and prevents an exited CLI leader becoming a zombie.
 	c.WaitDelay = 2 * time.Second
 	waitDone := make(chan error, 1)
-	go func() { waitDone <- c.Wait() }()
+	go func() {
+		waitErr := c.Wait()
+		killProcessGroup(c) // reap any descendants that outlive the CLI leader
+		waitDone <- waitErr
+	}()
 
 	idleSeconds := resolveIdleSeconds()
 	if idleOverride != nil {

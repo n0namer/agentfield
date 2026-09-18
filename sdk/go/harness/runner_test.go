@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -779,7 +778,6 @@ func TestRunCLIReapsExitedLeaderWhenDescendantHoldsPipe(t *testing.T) {
 	}
 	start := time.Now()
 	_, err := RunCLI(context.Background(), []string{"sh", "-c", "(trap '' HUP; sleep 30) & exit 0"}, nil, "", 10)
-	require.Error(t, err)
-	assert.ErrorIs(t, err, exec.ErrWaitDelay)
-	assert.Less(t, time.Since(start), 6*time.Second)
+	require.NoError(t, err)
+	assert.Less(t, time.Since(start), 6*time.Second, "descendant-held pipe must not keep the CLI leader unreaped until the command timeout")
 }
