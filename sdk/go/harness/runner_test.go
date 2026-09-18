@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -770,4 +771,15 @@ func TestOpenCodeProvider_OpenRouterOverlayUsesBaseModel(t *testing.T) {
 	assert.True(t, hasBase, "overlay must key the BASE model slug")
 	_, hasSuffixed := models["openai/gpt-4o#high"]
 	assert.False(t, hasSuffixed, "the #variant suffix must not leak into the overlay key")
+}
+
+func TestRunCLIReapsExitedLeaderWhenDescendantHoldsPipe(t *testing.T) {
+	if os.PathSeparator == '\\' {
+		t.Skip("POSIX process-group regression")
+	}
+	start := time.Now()
+	_, err := RunCLI(context.Background(), []string{"sh", "-c", "(trap '' HUP; sleep 30) & exit 0"}, nil, "", 10)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, exec.ErrWaitDelay)
+	assert.Less(t, time.Since(start), 6*time.Second)
 }

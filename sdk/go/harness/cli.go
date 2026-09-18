@@ -198,13 +198,11 @@ func runCLIWithStdin(ctx context.Context, cmd []string, env map[string]string, c
 	go drain(stdoutPipe, &stdout)
 	go drain(stderrPipe, &stderr)
 
-	// Wait for the child to exit on a separate goroutine so the watchdog
-	// loop below can observe idle stalls and abort early.
+	// Reap the child before joining pipe readers; descendants may inherit pipes.
+	// WaitDelay bounds that case and prevents an exited CLI leader becoming a zombie.
+	c.WaitDelay = 2 * time.Second
 	waitDone := make(chan error, 1)
-	go func() {
-		wg.Wait() // ensure all output is flushed before reaping
-		waitDone <- c.Wait()
-	}()
+	go func() { waitDone <- c.Wait() }()
 
 	idleSeconds := resolveIdleSeconds()
 	if idleOverride != nil {
@@ -237,6 +235,9 @@ func runCLIWithStdin(ctx context.Context, cmd []string, env map[string]string, c
 	} else {
 		waitErr = <-waitDone
 	}
+
+	// Wait has reaped the leader and may close descendant-held pipes on WaitDelay.
+	wg.Wait()
 
 	result := &CLIResult{
 		Stdout:     stdout.String(),
