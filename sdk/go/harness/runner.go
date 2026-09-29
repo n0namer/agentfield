@@ -84,6 +84,7 @@ func (r *Runner) Run(ctx context.Context, prompt string, schema map[string]any, 
 		defer os.RemoveAll(tempOutputDir)
 		outputDir = tempOutputDir
 		opts.schemaOutputDir = outputDir
+		opts.schema = schema
 	}
 
 	// schema_mode selects how the agent is asked to produce the output:
