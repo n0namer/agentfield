@@ -15,3 +15,16 @@
 - Agent-node manifests (`agentfield-package.yaml`) carry a `config_version` (schema version, e.g. `v1`; absent = `v0`) that is separate from the node's own `version:`. Bump `config_version` only for breaking format changes, never for additive fields. The single reader is `packages.ParsePackageMetadata` (`control-plane/internal/packages/installer.go`); the authoring contract lives in `docs/installing-agent-nodes.md`.
 - Desktop design/product specs live in `DESIGN.md` and `PRODUCT.md`.
 - Desktop featured-catalog copy is maintained in `desktop/src/shared/catalog.ts`; post-install descriptions come from each agent's `agentfield-package.yaml` (marketplace cards do not fetch YAML live).
+
+<!-- shared-ruflo-factory:start -->
+## Shared Ruflo AI Factory contract
+
+For non-trivial AI-assisted development, parallel Codex work, or a fresh agent session:
+
+- Load the canonical portable skill: https://github.com/n0namer/BMAD-MNNZ/blob/main/.agents/skills/ruflo-factory-operator/SKILL.md
+- On A55/shared Factory hosts, also read D:\Users\NIKITA\Documents\DEV\ruflo\docs\RUFLO_FACTORY_OPERATOR.md and D:\Users\NIKITA\Documents\DEV\ruflo\docs\AI_FACTORY_BOOTSTRAP.md.
+- Current explicit user instruction plus this repository's AGENTS/BMad/Git/tests/runtime evidence remain project truth. Shared Factory rules never override project-specific constraints.
+- When the Factory planning gate applies, do not release product implementation tasks before PLAN_ACCEPTED and do not create a competing plan/status document when project SoT already exists.
+- Ruflo owns logical DAG/retrieval/accepted learning; CrewSync owns live claims/leases/fencing; official Codex is the bounded repository executor. Worker or CrewSync DONE is candidate evidence only.
+- Preserve all project-local safety, approval, outbound, deploy and mutation restrictions in this file and the active BMad artifacts.
+<!-- shared-ruflo-factory:end -->
