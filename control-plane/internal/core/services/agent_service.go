@@ -703,6 +703,18 @@ func (as *DefaultAgentService) startNodeDependencies(node packages.InstalledPack
 	}
 }
 
+func (as *DefaultAgentService) runtimeProcessPath() string {
+	currentPath := os.Getenv("PATH")
+	if as.agentfieldHome == "" {
+		return currentPath
+	}
+	binDir := filepath.Join(as.agentfieldHome, "bin")
+	if currentPath == "" {
+		return binDir
+	}
+	return binDir + string(os.PathListSeparator) + currentPath
+}
+
 // buildProcessConfig creates a process configuration for starting an agent.
 // It reads the manifest entrypoint and resolves declared environment variables
 // from the encrypted secret store (prompting for missing required ones).
@@ -775,7 +787,7 @@ func (as *DefaultAgentService) buildProcessConfig(agentNode packages.InstalledPa
 			env = append(env, fmt.Sprintf("VIRTUAL_ENV=%s", venvPath))
 
 			// Prepend virtual environment bin to PATH (critical for package resolution)
-			currentPath := os.Getenv("PATH")
+			currentPath := as.runtimeProcessPath()
 			env = append(env, fmt.Sprintf("PATH=%s:%s", venvBinPath, currentPath))
 
 			// Unset PYTHONHOME to avoid conflicts with virtual environment
@@ -797,7 +809,7 @@ func (as *DefaultAgentService) buildProcessConfig(agentNode packages.InstalledPa
 			env = append(env, fmt.Sprintf("VIRTUAL_ENV=%s", venvPath))
 
 			// Prepend virtual environment Scripts to PATH (critical for package resolution)
-			currentPath := os.Getenv("PATH")
+			currentPath := as.runtimeProcessPath()
 			env = append(env, fmt.Sprintf("PATH=%s;%s", venvScriptsPath, currentPath))
 
 			// Unset PYTHONHOME to avoid conflicts with virtual environment
