@@ -237,7 +237,7 @@ func main() {
 	validateRegistration()
 
 	// Keep running so heartbeats continue
-	fmt.Println("\nAll agents running. Press Ctrl+C to stop.\n")
+	fmt.Print("\nAll agents running. Press Ctrl+C to stop.\n\n")
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh
