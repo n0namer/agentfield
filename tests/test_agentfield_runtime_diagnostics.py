@@ -60,18 +60,20 @@ class DiagnosticsTests(unittest.TestCase):
         self.assertEqual(diag.collect(client, NOW), [])
 
     def test_failed_timeout_and_running_stale(self):
+        stalled = run("running", "stale")
+        stalled["last_progress_at"] = (NOW - timedelta(hours=2)).isoformat()
         client = FakeClient(runs=[run("failed", "bad"), run("timeout", "timed"),
-                                  run("running", "stale"),
+                                  stalled,
                                   run("running", "fresh", (NOW - timedelta(seconds=10)).isoformat())])
         kinds = {a["kind"] for a in diag.collect(client, NOW, stale_seconds=1800)}
         self.assertEqual(kinds, {"execution_failed", "execution_timeout", "stale_execution"})
 
     def test_node_errors_with_exact_dedupe_keys(self):
         client = FakeClient(nodes=["swe-planner"], logs={"swe-planner": [
-            {"seq": 9, "level": "info", "line": "Failed to connect to memory events: WinError 1225 PRIVATE_SECRET"},
-            {"seq": 10, "level": "info", "line": "Max reconnection attempts reached (5)"},
-            {"seq": 11, "level": "warning", "line": "Provider returned 429 rate limit"},
-            {"seq": 12, "level": "info", "line": "Connected to AgentField server"},
+            {"seq": 9, "ts": "2026-10-19T18:00:00.001Z", "level": "info", "line": "Failed to connect to memory events: WinError 1225 PRIVATE_SECRET"},
+            {"seq": 10, "ts": "2026-10-19T18:00:00.002Z", "level": "info", "line": "Max reconnection attempts reached (5)"},
+            {"seq": 11, "ts": "2026-10-19T18:00:00.003Z", "level": "warning", "line": "Provider returned 429 rate limit"},
+            {"seq": 12, "ts": "2026-10-19T18:00:00.004Z", "level": "info", "line": "Connected to AgentField server"},
         ]})
         alarms = diag.collect(client, NOW)
         self.assertEqual([a["kind"] for a in alarms],
@@ -158,7 +160,7 @@ class DiagnosticsTests(unittest.TestCase):
     def test_missing_node_sequence_is_not_hashed_from_private_content(self):
         c = FakeClient(nodes=["swe-planner"], logs={"swe-planner": [
             {"level": "error", "line": "private_token_goes_here", "ts": "2026-10-19"},
-            {"seq": 0, "level": "error", "line": "unexpected error"}]})
+            {"seq": 0, "ts": "2026-10-19T18:00:00.005Z", "level": "error", "line": "unexpected error"}]})
         alerts = diag.collect(c, NOW)
         self.assertEqual(len(alerts), 1)
         self.assertEqual(alerts[0]["log_seq"], 0)
@@ -189,6 +191,69 @@ class DiagnosticsTests(unittest.TestCase):
             second = subprocess.run(args, capture_output=True, text=True, timeout=12)
             self.assertEqual(second.returncode, 2)
             self.assertEqual(len(path.read_text(encoding="utf-8").splitlines()), 1)
+
+
+
+    def test_node_seq_restart_generates_new_incident_without_private_content(self):
+        first = {"seq": 7, "ts": "2026-10-19T18:00:00.001Z",
+                 "level": "error", "line": "connection failed SECRET_1"}
+        second = {"seq": 7, "ts": "2026-10-19T18:10:00.002Z",
+                  "level": "error", "line": "connection failed SECRET_2"}
+        c = FakeClient(nodes=["swe-fast"], logs={"swe-fast": [first]})
+        with tempfile.TemporaryDirectory() as tmp:
+            state, journal = Path(tmp) / "state.json", Path(tmp) / "alerts.jsonl"
+            self.assertEqual(diag.publish_once(c, state_path=state, alerts_path=journal, now=NOW), (1, 1))
+            c.logs["swe-fast"] = [second]
+            self.assertEqual(diag.publish_once(c, state_path=state, alerts_path=journal, now=NOW), (1, 1))
+            records = [json.loads(x) for x in journal.read_text().splitlines()]
+            self.assertEqual(len(records), 2)
+            self.assertNotEqual(records[0]["key"], records[1]["key"])
+            self.assertNotIn("SECRET_", journal.read_text())
+
+    def test_valid_journal_without_terminal_newline_does_not_corrupt_append(self):
+        c = FakeClient(runs=[run("failed")])
+        with tempfile.TemporaryDirectory() as tmp:
+            state, journal = Path(tmp) / "state.json", Path(tmp) / "alerts.jsonl"
+            old = {"key": "old-inc", "kind": "execution_failed"}
+            journal.write_text(json.dumps(old), encoding="utf-8")
+            self.assertEqual(diag.publish_once(c, state_path=state, alerts_path=journal, now=NOW), (1, 1))
+            lines = journal.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(lines), 2)
+            self.assertEqual(json.loads(lines[0])["key"], "old-inc")
+            self.assertEqual(json.loads(lines[1])["key"], "execution_failed:exec_test")
+
+    def test_latest_activity_is_not_a_heartbeat(self):
+        active = run("running", started=(NOW - timedelta(hours=3)).isoformat())
+        active["latest_activity"] = (NOW - timedelta(hours=2)).isoformat()
+        active["updated_at"] = (NOW - timedelta(hours=2)).isoformat()
+        self.assertEqual(diag.collect(FakeClient(runs=[active]), NOW), [])
+
+    def test_explicit_progress_signal_can_indicate_staleness(self):
+        active = run("running", started=(NOW - timedelta(hours=3)).isoformat())
+        active["last_progress_at"] = (NOW - timedelta(hours=2)).isoformat()
+        kinds = [a["kind"] for a in diag.collect(FakeClient(runs=[active]), NOW)]
+        self.assertEqual(kinds, ["stale_execution"])
+
+
+    def test_legacy_node_key_migrates_without_historical_duplicate(self):
+        old_time = (NOW - timedelta(hours=2)).isoformat()
+        later_time = (NOW + timedelta(minutes=10)).isoformat()
+        c = FakeClient(nodes=["swe-fast"], logs={"swe-fast": [
+            {"seq": 8, "ts": old_time, "level": "error", "line": "past connection failure"}]})
+        with tempfile.TemporaryDirectory() as tmp:
+            state, journal = Path(tmp) / "state.json", Path(tmp) / "alerts.jsonl"
+            old_key = "node_runtime_error:swe-fast:8"
+            journal.write_text(json.dumps({"key": old_key, "kind": "node_runtime_error",
+                                           "observed_at": NOW.isoformat()}) + "\n", encoding="utf-8")
+            state.write_text(json.dumps({"seen": [old_key]}), encoding="utf-8")
+            self.assertEqual(diag.publish_once(c, state_path=state, alerts_path=journal, now=NOW), (1, 0))
+            c.logs["swe-fast"] = [
+                {"seq": 8, "ts": later_time, "level": "error", "line": "new generation failure"}]
+            self.assertEqual(diag.publish_once(c, state_path=state, alerts_path=journal,
+                                               now=NOW + timedelta(minutes=10)), (1, 1))
+            self.assertEqual(diag.publish_once(c, state_path=state, alerts_path=journal,
+                                               now=NOW + timedelta(minutes=10)), (1, 0))
+            self.assertEqual(len(journal.read_text(encoding="utf-8").splitlines()), 2)
 
 
 if __name__ == "__main__":

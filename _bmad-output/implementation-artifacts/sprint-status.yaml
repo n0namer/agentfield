@@ -9,7 +9,7 @@ north_star: >-
 development_status:
   agentfield-runtime-diagnostics-mvp: review
   obs-ui-mvp-r1-independent-qa-20261019: done
-  obs-ui-mvp-r2-collector-reliability-20261019: ready-for-dev
+  obs-ui-mvp-r2-collector-reliability-20261019: review
   obs-ui-mvp-r3-needs-attention-20261019: ready-for-dev
   obs-ui-mvp-r4-safe-delivery-20261019: backlog
   obs-ui-mvp-r5-integrated-acceptance-20261019: backlog

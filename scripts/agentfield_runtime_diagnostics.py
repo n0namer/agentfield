@@ -118,13 +118,15 @@ def classify_node(line: str, level: str) -> str | None:
 
 
 def make_alert(kind: str, entity: str, *, run_id: str = "", execution_id: str = "",
-               node_id: str = "", seq: int | None = None) -> dict:
-    key = f"{kind}:{entity}" + (f":{seq}" if seq is not None else "")
+               node_id: str = "", seq: int | None = None, event_time: str = "") -> dict:
+    # Agent-local seq resets on process restart. The log timestamp differentiates generations.
+    key = f"{kind}:{entity}" + (f":{seq}:{event_time}" if seq is not None and event_time
+                                else f":{seq}" if seq is not None else "")
     severity = "warning" if kind in {"node_rate_limited", "node_timeout", "stale_execution"} else "error"
     # Metadata only: raw log strings, inputs/outputs and Codex sessions are excluded.
     return {"key": key, "kind": kind, "severity": severity,
             "run_id": run_id, "execution_id": execution_id, "node_id": node_id,
-            "log_seq": seq,
+            "log_seq": seq, "event_time": event_time or None,
             "ui_path": f"/ui/runs/{quote(run_id, safe='')}" if run_id else "/ui/agents"}
 
 
@@ -148,11 +150,10 @@ def collect(client, now: datetime, stale_seconds: int = 1800) -> list[dict]:
                 alerts.append(make_alert("execution_timeout" if status.startswith("time") else "execution_failed",
                                          execution_id, run_id=run_id, execution_id=execution_id))
             if status == "running":
-                # Long-running SWE jobs are legitimate; alert on lack of progress, not age alone.
-                last_activity = (parse_started(run.get("latest_activity"))
-                                 or parse_started(run.get("updated_at"))
-                                 or parse_started(run.get("started_at")))
-                if last_activity and (now - last_activity).total_seconds() > stale_seconds:
+                # latest_activity is derived from LatestStarted, NOT a heartbeat.
+                # Be fail-closed about "stalled" until an explicit progress signal is present.
+                last_progress = parse_started(run.get("last_progress_at"))
+                if last_progress and (now - last_progress).total_seconds() > stale_seconds:
                     alerts.append(make_alert("stale_execution", execution_id, run_id=run_id, execution_id=execution_id))
             if status == "succeeded":
                 try:
@@ -190,10 +191,12 @@ def collect(client, now: datetime, stale_seconds: int = 1800) -> list[dict]:
             if kind is None:
                 continue
             seq = row.get("seq")
-            if not isinstance(seq, int) or isinstance(seq, bool) or seq < 0:
-                # A non-sequenced line cannot be replay-fenced without hashing private text.
+            when = parse_started(row.get("ts"))
+            if not isinstance(seq, int) or isinstance(seq, bool) or seq < 0 or when is None:
+                # Cannot replay-fence without a real timestamp and sequence; never hash private lines.
                 continue
-            alerts.append(make_alert(kind, node_id, node_id=node_id, seq=seq))
+            alerts.append(make_alert(kind, node_id, node_id=node_id, seq=seq,
+                                     event_time=when.isoformat(timespec="microseconds")))
     return alerts
 
 
@@ -230,6 +233,7 @@ def publish_once(client, *, state_path: Path, alerts_path: Path, now: datetime,
             else:
                 seen = set()
             old_seen = set(seen)
+            legacy_seen_at: dict[str, datetime] = {}
             # The alert journal is authoritative after a crash between append and cursor save.
             if alerts_path.exists():
                 try:
@@ -243,17 +247,38 @@ def publish_once(client, *, state_path: Path, alerts_path: Path, now: datetime,
                             if not isinstance(item, dict) or not isinstance(item.get("key"), str):
                                 raise ValueError("invalid journal item")
                             seen.add(item["key"])
+                            detected = parse_started(item.get("observed_at"))
+                            if detected:
+                                legacy_seen_at[item["key"]] = detected
                 except (ValueError, OSError, UnicodeError):
                     raise DiagnosticsError("Invalid alert journal; preserve file before replay") from None
             fresh = []
             for alert in alerts:
                 if alert["key"] in seen:
                     continue
+                # Migrate legacy kind:node:seq keys without re-alerting on historical
+                # lines; later timestamps indicate a new node generation.
+                if alert["node_id"] and alert["log_seq"] is not None and alert["event_time"]:
+                    old_key = f'{alert["kind"]}:{alert["node_id"]}:{alert["log_seq"]}'
+                    old_detected = legacy_seen_at.get(old_key)
+                    source_time = parse_started(alert["event_time"])
+                    if old_detected and source_time and source_time <= old_detected:
+                        seen.add(alert["key"])
+                        continue
                 fresh.append(alert)
                 seen.add(alert["key"])
             if fresh:
                 alerts_path.parent.mkdir(parents=True, exist_ok=True)
-                with alerts_path.open("a", encoding="utf-8") as fh:
+                # A fully valid final JSONL record may lack LF after a crash.
+                # Recover the separator before appending a new record.
+                needs_separator = False
+                if alerts_path.exists() and alerts_path.stat().st_size:
+                    with alerts_path.open("rb") as existing:
+                        existing.seek(-1, os.SEEK_END)
+                        needs_separator = existing.read(1) != b"\n"
+                with alerts_path.open("a", encoding="utf-8", newline="\n") as fh:
+                    if needs_separator:
+                        fh.write("\n")
                     for alert in fresh:
                         fh.write(json.dumps({"observed_at": now.isoformat(), **alert},
                                             ensure_ascii=False) + "\n")
