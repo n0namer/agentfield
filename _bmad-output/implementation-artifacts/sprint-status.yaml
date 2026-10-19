@@ -1,0 +1,7 @@
+# Native AgentField local workspace — feature-specific BMad source of truth
+# Pre-existing sprint-status.yaml was absent; this file records only this feature.
+project: agentfield
+updated: '2026-10-19'
+development_status:
+  agentfield-runtime-diagnostics-mvp: review
+  # Deferred: external alert recipient, Codex session aggregates and richer UI alerts.
