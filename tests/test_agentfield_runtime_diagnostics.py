@@ -3,6 +3,8 @@ from datetime import datetime, timedelta, timezone
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -171,6 +173,22 @@ class DiagnosticsTests(unittest.TestCase):
             with self.assertRaises(diag.DiagnosticsError):
                 diag.publish_once(c, state_path=state, alerts_path=journal, now=NOW)
             self.assertEqual(journal.read_text(encoding="utf-8"), "{partial")
+
+
+    def test_backend_outage_journaled_and_deduplicated_without_api(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            args = [sys.executable, str(SCRIPT), "--url", "http://127.0.0.1:1",
+                    "--state-dir", tmp]
+            first = subprocess.run(args, capture_output=True, text=True, timeout=12)
+            self.assertEqual(first.returncode, 2)
+            self.assertNotIn("secret", first.stderr.lower())
+            path = Path(tmp) / "alerts.jsonl"
+            entries = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(len(entries), 1)
+            self.assertEqual(entries[0]["kind"], "diagnostics_poll_failed")
+            second = subprocess.run(args, capture_output=True, text=True, timeout=12)
+            self.assertEqual(second.returncode, 2)
+            self.assertEqual(len(path.read_text(encoding="utf-8").splitlines()), 1)
 
 
 if __name__ == "__main__":

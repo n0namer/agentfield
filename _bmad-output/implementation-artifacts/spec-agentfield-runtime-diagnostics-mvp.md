@@ -25,7 +25,7 @@ Given the native API with historical Fast and Full records, when the collector r
 This repository has no existing BMad output or sprint-status.yaml. This is the feature-specific implementation artifact; no PLAN.md. CrewSync task creation was blocked by tool safety; do not assert CrewSync acceptance.
 
 ## Verified evidence (A55, 2026-10-19)
-- `python -m unittest discover -s tests -p test_agentfield_runtime_diagnostics.py -q`: 15/15 PASS (0.095s).
+- `python -m unittest discover -s tests -p test_agentfield_runtime_diagnostics.py -q`: 16/16 PASS (including subprocess-induced AgentField API outage and hourly dedupe).
 - `python -m py_compile scripts/agentfield_runtime_diagnostics.py`: PASS.
 - `python scripts/agentfield_runtime_diagnostics.py --state-dir D:\\_cache\\agentfield-ui-runtime\\diagnostics-smoke`: 13 anomalies; repeated polling: 0 new alerts.
 - Confirmed categories on real data: 3 execution_failed, 2 application_failed, 8 node_runtime_error. Existing Full `exec_20261019_174256_v7bjqcip` classified application_failed despite native transport succeeded.
@@ -34,7 +34,7 @@ This repository has no existing BMad output or sprint-status.yaml. This is the f
 - CrewSync readback found older overlapping but different forensic task `agentfield:v2-base20-runtime-log-forensics-20261013-r1` with a restricted write scope. New task creation refused by tool safety. Its status must not be represented as claimed, created or DONE.
 
 ## Adversarial review — triaged findings
-1. API outage is printed as an error, but a failed poll is not stored as a journal alert (defer).
+1. API outage previously lacked a durable journal record (fixed: hourly deduplicated diagnostics_poll_failed event, tested with unreachable loopback API).
 2. Node-local log seq may reset after node restart, so old keys can suppress new same-seq errors (defer).
 3. The task is interactive-user Task Scheduler: execution while Windows user is logged off is not guaranteed (defer).
 4. No external recipient is configured: no Telegram/email/webhook delivery occurred (external prerequisite).

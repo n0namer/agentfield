@@ -198,8 +198,8 @@ def collect(client, now: datetime, stale_seconds: int = 1800) -> list[dict]:
 
 
 def publish_once(client, *, state_path: Path, alerts_path: Path, now: datetime,
-                 stale_seconds: int = 1800) -> tuple[int, int]:
-    alerts = collect(client, now, stale_seconds)
+                 stale_seconds: int = 1800, injected_alerts: list[dict] | None = None) -> tuple[int, int]:
+    alerts = collect(client, now, stale_seconds) if injected_alerts is None else injected_alerts
     state_path.parent.mkdir(parents=True, exist_ok=True)
     lock_path = state_path.with_suffix(".lock")
     with lock_path.open("a+b") as lock_file:
@@ -296,7 +296,20 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"status": "ok", "findings": found, "new_alerts": fresh,
                               "alerts_file": str(args.state_dir / "alerts.jsonl")}, ensure_ascii=False), flush=True)
         except DiagnosticsError as err:
-            print(json.dumps({"status": "error", "category": str(err)}, ensure_ascii=False), file=sys.stderr, flush=True)
+            failure_now = datetime.now(timezone.utc)
+            # An unavailable control plane must itself leave a durable operator alert.
+            # Hourly incident keys bound local journal growth during prolonged outages.
+            try:
+                failure_alert = make_alert("diagnostics_poll_failed",
+                                           "agentfield:" + failure_now.strftime("%Y%m%d%H"))
+                publish_once(None, state_path=args.state_dir / "state.json",
+                             alerts_path=args.state_dir / "alerts.jsonl",
+                             now=failure_now, injected_alerts=[failure_alert])
+            except DiagnosticsError:
+                # Preserve corrupt state/journal untouched and rely on non-zero exit.
+                pass
+            print(json.dumps({"status": "error", "category": str(err)}, ensure_ascii=False),
+                  file=sys.stderr, flush=True)
             if not args.follow:
                 return 2
         if not args.follow:
