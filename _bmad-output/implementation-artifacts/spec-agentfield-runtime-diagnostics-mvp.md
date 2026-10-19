@@ -54,3 +54,26 @@ This repository has no existing BMad output or sprint-status.yaml. This is the f
 
 ## Gate
 Local diagnostic collector operational GREEN and persisted schedule readback GREEN. `in-review`: independent QA not yet signed and CrewSync acceptance not available. Do not call this CrewSync SERVER_DONE. Next: independent QA and existing observability-forwarder notification destination, then node-generation correlation and Codex metadata-only token sourcing.
+
+## Reconciled MVP queue (2026-10-19)
+CrewSync readback confirmed five newly created OPEN tasks, no claims, no completions:
+1. `agentfield:obs-ui-mvp-r1-independent-qa-20261019`: independent source/readback/QA of current commit, failure injection, journal replay and privacy, evidence handoff. Required gate.
+2. `agentfield:obs-ui-mvp-r2-collector-reliability-20261019`: repair node-generation seq collision, child-correlation where available, crash/logoff recovery and exact dedup tests. Depends on R1.
+3. `agentfield:obs-ui-mvp-r3-needs-attention-20261019`: existing Dashboard/Run pages show sanitized incident list and deep links, loading/API failures; no second UI. Depends on R1.
+4. `agentfield:obs-ui-mvp-r4-safe-delivery-20261019`: use existing observability-forwarder and a configured trusted recipient, bounded retries and private metadata only, one delivery per incident. Depends on R2. No outbound before destination contract.
+5. `agentfield:obs-ui-mvp-r5-integrated-acceptance-20261019`: real A55 failure->collector->UI->recipient->recovery->replay E2E, independent QA and CrewSync readback. Depends on R2/R3/R4.
+
+Execution: R1 first, R2/R3 parallel when READY and ownership isolated, R4 follows R2, R5 joins. Each ~20-40 minutes of useful focused work, not a promise of completion time. Per-item BMad Quick Dev scope when activated; current spec is the existing R0 implementation artifact. No PLAN.md and no deployment before GREEN.
+
+Source-of-truth drift correction: this spec previously said CrewSync task creation was blocked; the five *new* task keys above were successfully created and individually read back on 2026-10-19. The original `agentfield-runtime-diagnostics-local-watch` speculative key remains uncreated; do not claim it exists. Existing `agentfield:v2-base20-runtime-log-forensics-20261013-r1` is a distinct scoped task and is not overwritten or completed here.
+
+Primary KPI: verified actionable detection/delivery with correct run link and zero repeat effects on replay. Transport succeeded is not application success. Independent QA and server acceptance are distinct from tests PASS.
+
+## Independent QA R1 — RED (2026-10-19)
+- Reviewer: separate Codex CLI read-only execution; source SHA `665e36388cee8c37e40dada5c8bbe1721b4f094a`; report archived on A55 at `D:\_cache\agentfield-ui-runtime\independent-qa-20261019-r1.txt`.
+- Results: Python in read-only sandbox 10 PASS / 6 ERROR due no writable TEMP; in-memory journal model checks 5 PASS. Separate local A55 test 16/16 PASS. This is **not** an independent product QA_ACCEPT.
+- RED 1: `kind:node_id:seq` can collide when node process restarts and reuses sequence numbers.
+- RED 2: a journal whose final valid JSON object has no terminal newline will concatenate with the next append, corrupting JSONL and blocking replay.
+- RED 3: API `latest_activity` is not a reliable heartbeat; legitimate long-running executions can be falsely flagged stale.
+- Remediation: R2 must add reproducible RED tests and minimal fixes; r3 UI can proceed independently after review report. No acceptance until re-review on the new SHA.
+- QA origin: task `agentfield:obs-ui-mvp-r1-independent-qa-20261019` (report delivery only; RED verdict does not imply the underlying collector is DONE).
