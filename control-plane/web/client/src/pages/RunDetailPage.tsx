@@ -89,6 +89,7 @@ import { ExecutionObservabilityPanel } from "@/components/execution";
 import { normalizeExecutionStatus, isTerminalStatus } from "@/utils/status";
 import { safeExternalUrl } from "@/utils/safeExternalUrl";
 import { StatusPill } from "@/components/ui/status-pill";
+import { NativeExecutionOutcomeBadge } from "@/components/runs/NativeExecutionOutcomeBadge";
 import type {
   TriggerInfo,
   WebhookFailurePreview,
@@ -971,6 +972,7 @@ export function RunDetailPage() {
                 />
               );
             })()}
+            <NativeExecutionOutcomeBadge executionId={actionRootExecutionId} />
             {golden ? (
               <Badge
                 variant="metadata"

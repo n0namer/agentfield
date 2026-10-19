@@ -741,7 +741,7 @@ func (s *AgentFieldServer) Start() error {
 	}
 
 	// Start HTTP server (using net/http.Server for graceful shutdown support)
-	addr := ":" + strconv.Itoa(s.config.AgentField.Port)
+	addr := httpListenAddress(s.config.AgentField.Port)
 	httpServer := s.newHTTPServer(addr)
 	if !s.setHTTPServer(httpServer) {
 		return nil
@@ -759,6 +759,15 @@ func (s *AgentFieldServer) Start() error {
 		return fmt.Errorf("failed to start HTTP server on %s: %w", addr, err)
 	}
 	return nil
+}
+
+// httpListenAddress keeps the existing default while allowing local-only operation.
+// Local developer UIs should opt in when the host firewall is not enforcing inbound rules.
+func httpListenAddress(port int) string {
+	if os.Getenv("AGENTFIELD_BIND_LOOPBACK_ONLY") == "1" {
+		return net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
+	}
+	return ":" + strconv.Itoa(port)
 }
 
 func (s *AgentFieldServer) newHTTPServer(addr string) *http.Server {
