@@ -36,3 +36,19 @@ Converge live AgentField nodes and new tasks on native A55 Control Plane 18080; 
 
 ## Gate
 PRAF parallel native migration canary: GREEN. Global project/client traffic cutover and legacy archive: OPEN. No CrewSync SERVER_DONE and no claim that 94 historical old runs were moved. No changes to foreign dirty/untracked files.
+
+## Project-specific migration inventory (2026-10-20, second pass)
+- **PRAF Deep Research (af-deep-research)**: Windows process on 8802 -> native 18080, healthy active, native classify-query E2E succeeded. Legacy 8801 -> 8080 remains parallel. Existing consumer cutover still requires identification; canary must not be represented as the end of old traffic.
+- **PR-AF (independent pr-af repository, not Deep Research)**: source includes Go PR review node and Python PR review node. Existing defaults point at 8080, but no local active PR-AF listener/process was found; 8004 is SWE Fast, not PR-AF. Built source `go build -o D:\_cache\agentfield-ui-runtime\pr-af-18080-canary.exe ./cmd/pr-af` PASS. Started canary with `NODE_ID=pr-af-migration-canary PORT=8803 AGENTFIELD_SERVER=http://127.0.0.1:18080 AGENT_CALLBACK_URL=http://127.0.0.1:8803`: health OK, 18080 native registration active. No OPENROUTER_API_KEY/GH_TOKEN/AGENTFIELD_API_KEY present in observed launch environment: real pr-af.review integration cannot be accepted. The temporary Go process was stopped deliberately after smoke; port 8803 closed and node subsequently offline. Do not auto-start this credential-less/insecure canary.
+- **CodeAF (separate CodeAF repository)**: existing native 18080 nodes `swe-codeaf-mvp` (127.0.0.1:8006) and `swe-codeaf-validation` (127.0.0.1:8005) are healthy. This proves SWE wrappers use CodeAF; it does not prove every standalone CodeAF workflow registers as an AgentField node. Dirty CodeAF source untouched.
+- **SWE-AF**: native `swe-fast`, `swe-planner`, `swe-factory`, `swe-factory-30` on 18080, healthy. No migration required for these confirmed workers.
+- **Universal Solver (separate universal-solver repository)**: code-first orchestrator with multiple isolated AgentField compose testbeds, some intentionally using `control-plane:8080` inside their container network; they are not necessarily using the host's legacy 8080. Do not replace Docker-internal URLs with host `127.0.0.1:18080`. No distinct active universal-solver AgentField node confirmed in this inventory. Repository has foreign dirty changes; untouched.
+- **Skill Intelligence (separate af-skill-intelligence repository)**: Go libraries `acquisition`, `authoring`, `skillindex`, with `authoring.AgentFieldAuthor.BaseURL` as a client endpoint. Historical `skill-intelligence` node on legacy 8080 offline since Oct 5; no live standalone process found. Need resolve active caller + target reasoner before switching actual BaseURL. Dirty source untouched.
+- **Legacy 8080**: still has healthy `meta_deep_research` and `demo-go-agent`, plus 94 historical runs. Do not shut it down or merge storage. Docker/remote runtime checks remain unresolved.
+
+## Exact follow-up gates
+1. Find actual production PR-AF deployment credentials, webhook routes and active listeners through authorized runtime; launch configured PR-AF pointing to 18080, then verify a read-only/authorized review E2E and health before calling it migrated.
+2. For Universal Solver and Skill Intelligence, inventory live callers and isolate true node registrations from agent-client integrations; redirect only the real client/control-plane route. Preserve self-contained Docker testbeds.
+3. Verify source URL/route, identity and real app result for every new project, run independent QA. Keep legacy 8080 until callbacks, historical storage backup, and external consumers are accounted for.
+
+Gate for project-wide migration: OPEN. PR-AF compile/registration CANARY PASS only, NOT production GREEN. Avoid claiming CrewSync SERVER_DONE.

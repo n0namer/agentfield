@@ -13,6 +13,7 @@ development_status:
   obs-ui-mvp-r3-needs-attention-20261019: ready-for-dev
   obs-ui-mvp-r4-safe-delivery-20261019: backlog
   obs-ui-mvp-r5-integrated-acceptance-20261019: backlog
+  agentfield-18080-unification-20261020: in-progress
 # CrewSync task keys (exact):
 # agentfield:obs-ui-mvp-r1-independent-qa-20261019
 # agentfield:obs-ui-mvp-r2-collector-reliability-20261019
