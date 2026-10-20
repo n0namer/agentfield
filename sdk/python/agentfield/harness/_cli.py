@@ -310,6 +310,7 @@ async def run_cli(
         env=merged_env,
         cwd=cwd,
         start_new_session=True,
+        creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
     )
 
     max_output_bytes = _resolve_max_output_bytes()
@@ -349,6 +350,7 @@ async def run_cli(
                     capture_output=True,
                     timeout=5,
                     check=False,
+                    creationflags=subprocess.CREATE_NO_WINDOW,
                 )
             except (OSError, subprocess.SubprocessError):
                 pass
