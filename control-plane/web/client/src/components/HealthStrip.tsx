@@ -40,10 +40,19 @@ export function HealthStrip({ className }: HealthStripProps) {
     refreshAllLiveQueries,
   } = useSSESync();
   const llmLoading = llmHealth.isLoading;
-  const llmOk = llmHealth.data
-    ? llmHealth.data.healthy &&
-      !llmHealth.data.endpoints?.some((ep) => !ep.healthy)
-    : undefined;
+  // Disabled/unconfigured monitoring is not evidence of an unhealthy endpoint.
+  const llmOk = llmHealth.data?.enabled === false
+    ? undefined
+    : llmHealth.data
+      ? llmHealth.data.healthy &&
+        !llmHealth.data.endpoints?.some((ep) => !ep.healthy)
+      : undefined;
+  const llmUnknownLabel = llmHealth.data?.enabled === false ? "Disabled" : "Unknown";
+  const llmUnknownDetail = llmHealth.data?.enabled === false
+    ? "LLM endpoint monitoring is disabled"
+    : llmLoading
+      ? "Checking LLM health…"
+      : "LLM health status unavailable";
 
   const nodes: AgentNodeSummary[] = agents.data?.nodes ?? [];
   const totalAgents = agents.data?.count ?? nodes.length;
@@ -118,7 +127,7 @@ export function HealthStrip({ className }: HealthStripProps) {
                 variant="outline"
                 size="sm"
                 className={compactTriggerClass}
-                aria-label={`System status: LLM ${llmOk === true ? "healthy" : llmOk === false ? "degraded" : "unknown"}, ${onlineCount} of ${totalAgents} agents online, ${totalRunning} running, ${sseLabel}`}
+                aria-label={`System status: LLM ${llmOk === true ? "healthy" : llmOk === false ? "degraded" : llmUnknownLabel.toLowerCase()}, ${onlineCount} of ${totalAgents} agents online, ${totalRunning} running, ${sseLabel}`}
               >
                 <Activity className="size-3.5 shrink-0" aria-hidden />
                 <span className="tabular-nums text-muted-foreground">
@@ -166,9 +175,7 @@ export function HealthStrip({ className }: HealthStripProps) {
                         ? "All LLM endpoints responding"
                         : llmOk === false
                           ? "One or more LLM endpoints are unhealthy"
-                          : llmLoading
-                            ? "Checking LLM health…"
-                            : "LLM health status unavailable"}
+                          : llmUnknownDetail}
                     </div>
                   </div>
                 </li>
@@ -277,7 +284,7 @@ export function HealthStrip({ className }: HealthStripProps) {
                   variant={llmOk === true ? "secondary" : llmOk === false ? "destructive" : "outline"}
                   className="h-5 px-1.5 text-micro"
                 >
-                  {llmOk === true ? "Healthy" : llmOk === false ? "Degraded" : "Unknown"}
+                  {llmOk === true ? "Healthy" : llmOk === false ? "Degraded" : llmUnknownLabel}
                 </Badge>
               </div>
             </TooltipTrigger>
@@ -286,9 +293,7 @@ export function HealthStrip({ className }: HealthStripProps) {
                 ? "All LLM endpoints responding"
                 : llmOk === false
                   ? "One or more LLM endpoints are unhealthy"
-                  : llmLoading
-                    ? "Checking LLM health…"
-                    : "LLM health status unavailable"}
+                  : llmUnknownDetail}
             </TooltipContent>
           </Tooltip>
 
