@@ -2800,7 +2800,14 @@ class Agent(FastAPI):
         finally:
             reset_current_cost_tracker(usage_token)
 
+        # The agent-node heartbeat does not refresh a running execution.
+        # This progress heartbeat only lives while the coroutine is actually alive;
+        # the original active-time watchdog remains the hard deadline.
+        progress_url = callback_url.rsplit("/status", 1)[0] + "/heartbeat"
+        last_progress_heartbeat = time.monotonic()
+
         async def _watchdog() -> None:
+            nonlocal last_progress_heartbeat
             # Poll active-elapsed time and cancel the reasoner if the active
             # budget is exceeded. ``check_interval`` is a small fraction of
             # the timeout so we don't oversleep our own deadline by much.
@@ -2830,6 +2837,38 @@ class Agent(FastAPI):
                     pause_clock.timed_out = True
                     reasoner_task.cancel()
                     return
+
+                # Don't turn an approval wait into a running state, or send
+                # progress once the actual reasoner coroutine has finished.
+                if reasoner_task.done() or pause_clock._pause_started_at is not None:
+                    continue
+                if time.monotonic() - last_progress_heartbeat < max(0.05, float(getattr(self, "_execution_heartbeat_interval_seconds", 45.0))):
+                    continue
+                last_progress_heartbeat = time.monotonic()
+                try:
+                    response = await asyncio.wait_for(
+                        self.client._async_request(
+                            "POST", progress_url,
+                            json={
+                                "node_id": self.node_id,
+                                "instance_id": self.agent_instance_id,
+                            },
+                            timeout=3.0,
+                        ),
+                        timeout=4.0,
+                    )
+                    if response.status_code != 204:
+                        log_warn(
+                            f"Execution {execution_id} progress heartbeat returned "
+                            f"HTTP {response.status_code}"
+                        )
+                except (Exception, asyncio.TimeoutError) as exc:
+                    # Retry next interval, never cancel useful work because
+                    # the control plane temporarily failed to acknowledge.
+                    log_warn(
+                        f"Execution {execution_id} progress heartbeat unavailable: "
+                        f"{type(exc).__name__}"
+                    )
 
         watchdog_task = asyncio.create_task(_watchdog())
 
