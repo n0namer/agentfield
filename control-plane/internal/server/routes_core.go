@@ -137,6 +137,7 @@ func (s *AgentFieldServer) registerCoreRoutes(agentAPI *gin.RouterGroup) {
 	agentAPI.GET("/executions/:execution_id/events", s.streamHandler(handlers.StreamExecutionEventsHandler(s.storage)))
 	agentAPI.POST("/executions/batch-status", handlers.BatchExecutionStatusHandler(s.storage))
 	agentAPI.POST("/executions/:execution_id/status", handlers.UpdateExecutionStatusHandler(s.storage, s.payloadStore, s.webhookDispatcher, s.config.AgentField.ExecutionQueue.AgentCallTimeout))
+	agentAPI.POST("/executions/:execution_id/heartbeat", handlers.ExecutionHeartbeatHandler(s.storage))
 	agentAPI.POST("/executions/:execution_id/logs", handlers.StructuredExecutionLogsHandler(s.storage, func() config.ExecutionLogsConfig {
 		return s.config.AgentField.ExecutionLogs
 	}))
