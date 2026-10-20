@@ -782,8 +782,13 @@ class AsyncExecutionManager:
                                 f"Execution was cancelled: {execution._cancellation_reason}"
                             )
                         elif execution.status == ExecutionStatus.TIMEOUT:
+                            # The control plane may reap an idle execution long
+                            # before the SDK hard deadline. Surface the actual
+                            # terminal cause instead of claiming the six-hour
+                            # maximum elapsed.
                             raise ExecutionTimeoutError(
-                                f"Execution timed out after {execution.timeout} seconds"
+                                execution.error_message
+                                or f"Execution timed out after {execution.timeout} seconds"
                             )
 
                 # Toggle the parent's pause-clock based on the child's status.

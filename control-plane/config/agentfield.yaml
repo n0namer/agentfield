@@ -9,7 +9,10 @@ agentfield:
     cleanup_interval: 5m
     batch_size: 200
     preserve_recent_duration: 1h
-    stale_execution_timeout: 10m
+    # Compatibility guard for long Codex/LLM calls on older SWE nodes without
+    # per-execution progress heartbeat. New SDK sends a 45s activity heartbeat.
+    # Keep genuine abandoned jobs reapable; do not disable cleanup entirely.
+    stale_execution_timeout: 90m
     # max_retries only rewinds stale workflow rows to pending; no dispatcher
     # re-enqueues them, so do not rely on it for execution retries.
     max_retries: 0
