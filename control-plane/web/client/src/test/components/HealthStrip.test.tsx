@@ -104,6 +104,18 @@ describe("HealthStrip", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("does not mark disabled LLM monitoring as degraded", () => {
+    state.llmHealth.mockReturnValue({
+      isLoading: false,
+      data: { enabled: false, endpoints: [] },
+    });
+    render(<HealthStrip />);
+    expect(screen.getByText("Disabled")).toBeInTheDocument();
+    expect(screen.queryByText("Degraded")).not.toBeInTheDocument();
+    expect(screen.getAllByText("LLM endpoint monitoring is disabled")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: /System status: LLM disabled/i })).toBeInTheDocument();
+  });
+
   it("renders loading and disconnected states and refreshes when requested", async () => {
     const user = userEvent.setup();
 

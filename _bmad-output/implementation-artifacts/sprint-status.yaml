@@ -1,0 +1,25 @@
+# AgentField A55 native observability MVP.
+# CrewSync is authoritative for live task claim/completion; this file tracks BMad stages.
+project: agentfield
+updated: '2026-10-19'
+north_star: >-
+  Existing native AgentField UI shows truthful SWE Fast/Full traces and logs;
+  bounded read-only diagnostics survive replay/restart and deliver actionable
+  private alerts with links to the affected execution. Independent QA verifies E2E.
+development_status:
+  agentfield-runtime-diagnostics-mvp: review
+  obs-ui-mvp-r1-independent-qa-20261019: done
+  obs-ui-mvp-r2-collector-reliability-20261019: review
+  obs-ui-mvp-r3-needs-attention-20261019: ready-for-dev
+  obs-ui-mvp-r4-safe-delivery-20261019: backlog
+  obs-ui-mvp-r5-integrated-acceptance-20261019: backlog
+  agentfield-18080-unification-20261020: in-progress
+# CrewSync task keys (exact):
+# agentfield:obs-ui-mvp-r1-independent-qa-20261019
+# agentfield:obs-ui-mvp-r2-collector-reliability-20261019
+# agentfield:obs-ui-mvp-r3-needs-attention-20261019
+# agentfield:obs-ui-mvp-r4-safe-delivery-20261019
+# agentfield:obs-ui-mvp-r5-integrated-acceptance-20261019
+# Dependencies: R1 -> R2,R3; R2 -> R4; R2,R3,R4 -> R5.
+# Broader AgentField Native lifecycle backlog remains separate, not implicitly DONE.
+# Post-MVP: Codex JSONL aggregate usage and cost/quotas attribution; no release blocker.
