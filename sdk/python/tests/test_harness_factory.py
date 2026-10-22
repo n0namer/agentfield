@@ -44,14 +44,41 @@ def test_supported_providers_contains_expected_names():
     assert "grok" in SUPPORTED_PROVIDERS
 
 
-def test_default_provider_is_aforge(monkeypatch):
-    from agentfield.harness.providers.aforge import AforgeProvider
+def test_default_provider_is_platform_default(monkeypatch):
+    from agentfield.harness._defaults import platform_default_harness_provider
+    from agentfield.harness.providers.codex import CodexProvider
+    from agentfield.harness.providers.opencode import OpenCodeProvider
 
     # HarnessConfig.provider resolves through AGENTFIELD_HARNESS_PROVIDER, so the
     # ambient value has to be cleared for this to assert the built-in default.
     monkeypatch.delenv("AGENTFIELD_HARNESS_PROVIDER", raising=False)
-    assert HarnessConfig().provider == "aforge"
-    assert isinstance(build_provider(HarnessConfig()), AforgeProvider)
+    expected = platform_default_harness_provider()
+    assert HarnessConfig().provider == expected
+    provider = build_provider(HarnessConfig())
+    assert isinstance(
+        provider, CodexProvider if expected == "codex" else OpenCodeProvider
+    )
+
+
+@pytest.mark.parametrize(
+    ("platform", "provider_type"),
+    [("win32", "codex"), ("linux", "opencode")],
+)
+def test_build_provider_uses_implicit_platform_provider(
+    monkeypatch, platform, provider_type
+):
+    monkeypatch.delenv("AGENTFIELD_HARNESS_PROVIDER", raising=False)
+    monkeypatch.setattr("agentfield.harness._defaults.sys.platform", platform)
+    config = HarnessConfig(provider="")
+    provider = build_provider(config)
+    assert provider.__class__.__name__.lower().startswith(provider_type)
+
+
+def test_build_provider_explicit_provider_beats_platform_and_environment(monkeypatch):
+    monkeypatch.setenv("AGENTFIELD_HARNESS_PROVIDER", "opencode")
+    monkeypatch.setattr("agentfield.harness._defaults.sys.platform", "win32")
+    provider = build_provider(_make_config("codex"))
+    assert provider.__class__.__name__ == "CodexProvider"
 
 
 def test_build_provider_pi_returns_pi_provider():

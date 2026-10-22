@@ -10,21 +10,23 @@ import (
 // providing lazy initialization and a convenience Harness() method.
 // HarnessConfig configures the default harness runner for the agent.
 type HarnessConfig struct {
-	// Provider is the default provider: "aforge", "claude-code", "codex",
+	// Provider is the harness provider: "aforge", "claude-code", "codex",
 	// "gemini", "opencode", "pi", or "omp". When empty,
-	// AGENTFIELD_HARNESS_PROVIDER overrides the default, "aforge"
-	// (AgentField's native harness). An explicit value always wins.
+	// AGENTFIELD_HARNESS_PROVIDER wins when set; otherwise the platform default
+	// is Codex on Windows and OpenCode elsewhere. An explicit value always wins.
 	Provider string
 
-	// Model is the default model identifier. Empty means the provider's own
-	// default. It may carry a
+	// Model is the default model identifier. Empty consults
+	// AGENTFIELD_HARNESS_MODEL before the implicit platform model; explicit
+	// non-platform providers otherwise keep their own default. It may carry a
 	// reasoning-effort variant after a "#" separator (e.g.
 	// "openrouter/z-ai/glm-5.2#high").
 	Model string
 
 	// Variant is the default provider-specific reasoning-effort variant
-	// (e.g. "high", "minimal"). It wins over a "#variant" suffix on Model;
-	// providers without an effort control drop it.
+	// (e.g. "high", "minimal"). Empty consults AGENTFIELD_HARNESS_VARIANT
+	// before the implicit platform variant. It wins over a "#variant" suffix on
+	// Model; providers without an effort control drop it.
 	Variant string
 
 	// MaxTurns is the default max agent iterations.

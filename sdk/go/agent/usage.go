@@ -139,9 +139,6 @@ func (a *Agent) recordHarnessUsage(ctx context.Context, result *harness.Result, 
 	if provider == "" && a.cfg.HarnessConfig != nil {
 		provider = a.cfg.HarnessConfig.Provider
 	}
-	provider = harness.ResolveProviderName(provider)
-	harnessName := strings.ReplaceAll(provider, "-", "_")
-
 	model := result.Model
 	if model == "" {
 		model = opts.Model
@@ -149,6 +146,11 @@ func (a *Agent) recordHarnessUsage(ctx context.Context, result *harness.Result, 
 	if model == "" && a.cfg.HarnessConfig != nil {
 		model = a.cfg.HarnessConfig.Model
 	}
+	resolved := harness.ResolvePlatformDefaults(harness.Options{Provider: provider, Model: model})
+	provider = resolved.Provider
+	model = resolved.Model
+	harnessName := strings.ReplaceAll(provider, "-", "_")
+
 	// Attribute usage to the BASE model: a "#variant" reasoning-effort
 	// suffix is a harness dispatch detail, not part of the model id (the
 	// Python SDK likewise records the provider-reported base model).

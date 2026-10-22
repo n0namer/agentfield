@@ -198,19 +198,19 @@ func TestInvariant_Runner_ProviderFactoryExhaustiveness(t *testing.T) {
 }
 
 // TestInvariant_Runner_ProviderFactoryDefaultSelection verifies that an
-// empty provider name selects DefaultProvider instead of erroring.
+// empty provider name selects the platform resolver result instead of erroring.
 func TestInvariant_Runner_ProviderFactoryDefaultSelection(t *testing.T) {
 	// An ambient AGENTFIELD_HARNESS_PROVIDER would legitimately win over the
-	// built-in default; this invariant is about the no-configuration case.
+	// built-in platform default; this invariant is about the no-configuration case.
 	t.Setenv(ProviderEnvVar, "")
 	prov, err := BuildProvider("", "")
-	require.NoError(t, err, "BuildProvider must not error for empty provider (selects default)")
-	require.NotNil(t, prov, "BuildProvider must return non-nil for empty provider (selects default)")
+	require.NoError(t, err, "BuildProvider must not error for empty provider")
+	require.NotNil(t, prov, "BuildProvider must return non-nil for empty provider")
 
-	defaultProv, err := BuildProvider(DefaultProvider, "")
-	require.NoError(t, err, "BuildProvider must not error for DefaultProvider %q", DefaultProvider)
-	assert.IsType(t, defaultProv, prov,
-		"empty provider must select the same type as DefaultProvider %q", DefaultProvider)
+	resolvedProv, err := BuildProvider(ResolveProviderName(""), "")
+	require.NoError(t, err, "BuildProvider must accept the resolved platform provider")
+	assert.IsType(t, resolvedProv, prov,
+		"empty provider must select the same type as ResolveProviderName")
 }
 
 // TestInvariant_Runner_ProviderFactoryUnknownReturnsError verifies that

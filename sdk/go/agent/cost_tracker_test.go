@@ -301,8 +301,9 @@ func TestRecordHarnessUsage(t *testing.T) {
 		assert.Equal(t, "openrouter", entries[0]["provider"])
 	})
 
-	t.Run("provider defaults to aforge", func(t *testing.T) {
+	t.Run("provider defaults to platform route", func(t *testing.T) {
 		t.Setenv(harness.ProviderEnvVar, "")
+		t.Setenv(harness.ModelEnvVar, "")
 		a := newAgentForTest(t)
 		tracker := NewCostTracker()
 		ctx := contextWithCostTracker(context.Background(), tracker)
@@ -311,8 +312,9 @@ func TestRecordHarnessUsage(t *testing.T) {
 
 		entries := tracker.Serialize()["entries"].([]map[string]any)
 		require.Len(t, entries, 1)
-		assert.Equal(t, "aforge", entries[0]["harness"])
-		assert.Equal(t, "aforge", entries[0]["model"])
+		resolved := harness.ResolvePlatformDefaults(harness.Options{})
+		assert.Equal(t, resolved.Provider, entries[0]["harness"])
+		assert.Equal(t, resolved.Model, entries[0]["model"])
 	})
 
 	t.Run("provider falls back to environment", func(t *testing.T) {
@@ -325,8 +327,13 @@ func TestRecordHarnessUsage(t *testing.T) {
 
 		entries := tracker.Serialize()["entries"].([]map[string]any)
 		require.Len(t, entries, 1)
-		assert.Equal(t, "codex", entries[0]["harness"])
-		assert.Equal(t, "codex", entries[0]["model"])
+		resolved := harness.ResolvePlatformDefaults(harness.Options{Provider: "codex"})
+		expectedModel := resolved.Model
+		if expectedModel == "" {
+			expectedModel = resolved.Provider
+		}
+		assert.Equal(t, resolved.Provider, entries[0]["harness"])
+		assert.Equal(t, expectedModel, entries[0]["model"])
 	})
 
 	t.Run("result model wins and has variant suffix stripped", func(t *testing.T) {
@@ -342,7 +349,7 @@ func TestRecordHarnessUsage(t *testing.T) {
 
 		entries := tracker.Serialize()["entries"].([]map[string]any)
 		require.Len(t, entries, 1)
-		assert.Equal(t, "aforge", entries[0]["harness"])
+		assert.Equal(t, harness.ResolvePlatformDefaults(harness.Options{}).Provider, entries[0]["harness"])
 		assert.Equal(t, "~deepseek/deepseek-v4-flash-latest", entries[0]["model"])
 		assert.Equal(t, "~deepseek", entries[0]["provider"])
 	})

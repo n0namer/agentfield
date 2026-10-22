@@ -1,14 +1,15 @@
 # pyright: reportMissingImports=false
 
 import pytest
+from agentfield.harness._defaults import platform_default_harness_provider
 from agentfield.harness._result import HarnessResult, Metrics, RawResult
 from agentfield.harness.providers._factory import build_provider
 from agentfield.types import HarnessConfig
 
 
-def test_harness_config_provider_defaults_to_aforge(monkeypatch):
+def test_harness_config_provider_defaults_to_platform_provider(monkeypatch):
     monkeypatch.delenv("AGENTFIELD_HARNESS_PROVIDER", raising=False)
-    assert HarnessConfig().provider == "aforge"
+    assert HarnessConfig().provider == platform_default_harness_provider()
 
 
 def test_harness_config_defaults():

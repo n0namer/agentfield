@@ -37,7 +37,7 @@ func TestRunner_Run_NoSchema(t *testing.T) {
 	runner := NewRunner(Options{Provider: "opencode"})
 
 	// We can't easily test with real providers, so test the merge/validation logic
-	t.Run("empty provider defaults to aforge", func(t *testing.T) {
+	t.Run("empty provider defaults to the platform provider", func(t *testing.T) {
 		t.Setenv(ProviderEnvVar, "")
 		r := NewRunner(Options{BinPath: filepath.Join(t.TempDir(), "missing-aforge")})
 		result, err := r.Run(context.Background(), "test", nil, nil, Options{})

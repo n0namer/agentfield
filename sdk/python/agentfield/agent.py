@@ -3899,8 +3899,10 @@ class Agent(FastAPI):
             schema: Pydantic BaseModel class for structured output validation.
             provider: Override provider ("aforge", "claude-code", "codex", "gemini",
                 "opencode", "grok", "pi", "omp"). Omit to use
-                ``AGENTFIELD_HARNESS_PROVIDER`` when set, otherwise ``aforge``.
-            model: Override model identifier. Empty uses the provider's own default.
+                ``AGENTFIELD_HARNESS_PROVIDER`` when set, otherwise the platform
+                default (Codex on Windows, OpenCode on Unix-like systems).
+            model: Override model identifier. Empty uses ``AGENTFIELD_HARNESS_MODEL``
+                when set, then the implicit platform model for the platform provider.
             variant: Provider-specific reasoning-effort variant. Wins over a
                 ``#variant`` suffix on the model when supported by the provider.
             max_turns: Maximum agent iterations.
@@ -3972,7 +3974,7 @@ class Agent(FastAPI):
                 derive_provider,
                 get_current_cost_tracker,
             )
-            from agentfield.harness._defaults import resolve_harness_provider
+            from agentfield.harness._defaults import resolve_harness_options
 
             input_tokens = getattr(result, "input_tokens", 0) or 0
             output_tokens = getattr(result, "output_tokens", 0) or 0
@@ -3991,16 +3993,17 @@ class Agent(FastAPI):
             if tracker is None:
                 return
 
-            resolved_provider = resolve_harness_provider(
-                str(provider) if provider else self._harness_provider_name()
+            resolved = resolve_harness_options(
+                str(provider) if provider else self._harness_provider_name(),
+                str(model) if model else self._harness_model_name(),
             )
+            resolved_provider = resolved["provider"]
             harness_name = (
                 resolved_provider.replace("-", "_") if resolved_provider else None
             )
             model_name = (
                 getattr(result, "model", None)
-                or model
-                or self._harness_model_name()
+                or resolved["model"]
                 or (resolved_provider or "harness")
             )
             total = getattr(result, "total_tokens", 0) or (

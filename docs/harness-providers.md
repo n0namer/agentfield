@@ -2,13 +2,14 @@
 
 `app.harness()` hands a task to a coding agent — a multi-turn worker that reads,
 writes, and edits files, then reports back through the same structured-output
-contract as `app.ai()`. AgentField ships its own harness, **AForge**, and it is
-the default: a call with no provider set runs `aforge`. Naming a different
-provider swaps the worker without changing the surrounding loop, which is how
-you orchestrate Claude Code, Codex, Gemini CLI, OpenCode, Pi, or OMP from a
-reasoner.
+contract as `app.ai()`. In the Go and Python SDKs, an unconfigured harness is
+platform-aware: Windows selects Codex with `gpt-5.6-luna` and reasoning `low`;
+Unix-like systems select OpenCode with `broker/fast-coding` and leave reasoning
+to the provider. Explicit call/config/environment values always win. The
+TypeScript SDK retains its existing AForge default until its routing policy is
+changed separately.
 
-## Default: AForge
+## AForge
 
 The `aforge` binary is provisioned alongside the `af` CLI — the curl installer,
 the desktop app, and the published Docker images all ship it. To install or
@@ -48,14 +49,19 @@ Provider selection follows one precedence chain:
 | Order | Source | Example |
 | --- | --- | --- |
 | 1 | Explicit value on the call or in the agent's harness config | `app.harness(task, provider="codex")` |
-| 2 | `AGENTFIELD_HARNESS_PROVIDER` environment variable | `AGENTFIELD_HARNESS_PROVIDER=claude-code` |
-| 3 | Default | `aforge` |
+| 2 | AgentField harness environment overrides | `AGENTFIELD_HARNESS_PROVIDER=claude-code`, `AGENTFIELD_HARNESS_MODEL=...`, `AGENTFIELD_HARNESS_VARIANT=...` |
+| 3 | Go/Python platform default | Windows: `codex` + `gpt-5.6-luna` + `low`; Unix-like: `opencode` + `broker/fast-coding` |
+| 3 | TypeScript default | `aforge` |
+
+`AGENTFIELD_HARNESS_MODEL` and `AGENTFIELD_HARNESS_VARIANT` are Go/Python
+AgentField overrides. Generic OpenCode variables such as `HARNESS_MODEL` do not
+silently override the Windows Codex route.
 
 Same loop code, different worker:
 
 ```python
-# AForge — nothing to configure
-report = await app.harness(task, schema=Report)
+# AForge explicitly (Go/Python platform defaults may select another provider)
+report = await app.harness(task, schema=Report, provider="aforge")
 
 # Orchestrate Claude Code instead
 report = await app.harness(task, schema=Report, provider="claude-code")
@@ -73,7 +79,7 @@ Python, `agent.HarnessConfig{Provider: "codex"}` in Go).
 
 | Provider | Install | Python extra | Required CLI | Authentication |
 | --- | --- | --- | --- | --- |
-| `aforge` (default) | `af aforge ensure` (shipped with `af`) | None | `aforge` | `OPENROUTER_API_KEY` |
+| `aforge` | `af aforge ensure` (shipped with `af`) | None | `aforge` | `OPENROUTER_API_KEY` |
 | `claude-code` | `pip install 'agentfield[harness-claude]'` | `agentfield[harness-claude]` | Bundled by `claude-agent-sdk` | Claude login or `ANTHROPIC_API_KEY` |
 | `codex` | `npm install -g @openai/codex` | `agentfield[harness-codex]` | `codex` | Codex login or `OPENAI_API_KEY` |
 | `gemini` | `npm install -g @google/gemini-cli` | None | `gemini` | Gemini login, `GEMINI_API_KEY`, or `GOOGLE_API_KEY` |

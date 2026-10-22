@@ -10,6 +10,7 @@ import pytest
 from pydantic import BaseModel
 from unittest.mock import patch
 
+from agentfield.harness._defaults import platform_default_harness_provider
 from agentfield.harness._result import Metrics, RawResult
 from agentfield.harness._runner import (
     HarnessRunner,
@@ -265,7 +266,7 @@ async def test_run_with_schema_injects_prompt_suffix_and_parses_output(tmp_path)
 
 
 @pytest.mark.asyncio
-async def test_run_defaults_to_aforge_when_no_provider_set(tmp_path, monkeypatch):
+async def test_run_defaults_to_platform_provider_when_no_provider_set(tmp_path, monkeypatch):
     monkeypatch.delenv("AGENTFIELD_HARNESS_PROVIDER", raising=False)
     runner = HarnessRunner()
     provider = MockProvider([RawResult(result="ok")])
@@ -278,7 +279,7 @@ async def test_run_defaults_to_aforge_when_no_provider_set(tmp_path, monkeypatch
     with patch("agentfield.harness._runner.build_provider", fake_build_provider):
         result = await runner.run("hello", cwd=str(tmp_path))
 
-    assert captured["provider"] == "aforge"
+    assert captured["provider"] == platform_default_harness_provider()
     assert result.result == "ok"
 
 

@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -26,9 +27,9 @@ type Runner struct {
 
 // NewRunner creates a harness runner with default options.
 func NewRunner(defaults Options) *Runner {
-	// The provider is deliberately NOT resolved here: Run() applies the
-	// explicit > AGENTFIELD_HARNESS_PROVIDER > DefaultProvider chain at
-	// dispatch time, so an env change is picked up by an existing runner.
+	// Harness defaults are deliberately NOT resolved here: Run() applies
+	// explicit options > AgentField harness env overrides > platform defaults
+	// at dispatch time, so env changes are picked up by an existing runner.
 	return &Runner{
 		DefaultOptions: defaults,
 		Logger:         log.New(io.Discard, "[harness] ", log.LstdFlags),
@@ -54,8 +55,7 @@ type schemaAware interface {
 // The schema parameter should be a JSON Schema as map[string]any. If dest
 // is non-nil, the validated output is unmarshalled into it.
 func (r *Runner) Run(ctx context.Context, prompt string, schema map[string]any, dest any, overrides Options) (*Result, error) {
-	opts := r.mergeOptions(overrides)
-	opts.Provider = ResolveProviderName(opts.Provider)
+	opts := resolveRunnerOptionsFor(runtime.GOOS, r.DefaultOptions, overrides)
 
 	provider, err := r.buildProvider(opts)
 	if err != nil {
