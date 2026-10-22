@@ -25,3 +25,4 @@ control-plane/migrations/** linguist-vendored
 # Renderer source is text. Some historical TSX blobs contain literal NUL
 # delimiters; force textual review diffs while those blobs remain in history.
 *.tsx text diff
+graphify-out/graph.json merge=graphify

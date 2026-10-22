@@ -1,0 +1,119 @@
+{
+  "schema": "agentfield.basefive-r14.architecture-contract.v1",
+  "acceptance": "UNACCEPTED",
+  "project": "agentfield",
+  "git_at_launch": "44167dc1050f5bff79abc32fab19c0bb50643093",
+  "scope": "Source-visible execution API and optional durable async idempotency; not a complete repository or runtime topology",
+  "sources": [
+    {"id":"handler","path":"control-plane/internal/handlers/execute.go","sha256":"be09150579e29e16ce9d96775ef1b161898d829570b9bdd5885c9db5327a25c1","package":"handlers"},
+    {"id":"storage","path":"control-plane/internal/storage/execution_idempotency.go","sha256":"7ff044cdce4e1ec772e3e79a6d4e074e9fece17c2a6857bdf0f4552a1db9cfe2","package":"storage"},
+    {"id":"graph","path":"graphify-out/graph.json","sha256":"1f00b4b243e4f4ec7e9fb35a8373c2054f95615fe4a454ab8e02addee1cc8f5d"},
+    {"id":"archmodel","path":".archsteer/model.json","sha256":"0350f5afc09c996266c2745fb27e2fd2d29e3245e15f1568f8f6681206f17f04"},
+    {"id":"archdoc","path":".archsteer/architecture.md","sha256":"af90dfa9b7d59211a5d90d0fe057d569d841ef34d7c1c177f446e957584d4c5a"}
+  ],
+  "coverage": {
+    "graphify": {"status":"PARTIAL_UNVERIFIED","method":"Inventory source_file nodes for the two authorized Go files and their package directories; graph presence is not freshness or Go semantic coverage","source_fingerprints":"UNVERIFIED","call_edges":"UNVERIFIED","repository_completeness":"UNVERIFIED"},
+    "archsteer": {"status":"PARTIAL_UNVERIFIED","paths":[".archsteer/model.json",".archsteer/architecture.md"],"initial_read_receipt":"GO_WAVE_NODE_ERROR:file_missing_or_oversized","recovery":"Bounded range reads and Node inventory of authorized artifacts","model_schema_version":"1.0.0","model_commit_sha":"44167dc1","comparison":"INVENTORY_ONLY","source_fingerprints":"UNVERIFIED","go_semantics":"UNVERIFIED"},
+    "inventory": {
+      "graph_nodes":31049,"graph_go_nodes":14586,"graph_go_source_paths":1102,
+      "graph_targets":[{"path":"control-plane/internal/handlers/execute.go","nodes":43,"package_source_paths":235},{"path":"control-plane/internal/storage/execution_idempotency.go","nodes":0,"package_source_paths":75}],
+      "arch_components":1210,"arch_go_components":0,
+      "arch_languages":{"python":447,"javascript":15,"tsx":354,"typescript":394},
+      "arch_targets":[{"path":"control-plane/internal/handlers/execute.go","component_present":false,"package_components":0},{"path":"control-plane/internal/storage/execution_idempotency.go","component_present":false,"package_components":0}],
+      "arch_document_mentions":[{"path":"control-plane/internal/handlers/execute.go","present":false},{"path":"control-plane/internal/storage/execution_idempotency.go","present":false}],
+      "arch_component_fingerprint_fields":[]
+    },
+    "go_blind_spots":["Router registration and HTTP URL/method","Imported pkg/types DTO definitions and versions","Migration constraints and database engine","Worker dispatch implementation and restart recovery","Graph Go AST/call-edge completeness","Native ReleaseGate task/result E2E and independent QA"]
+  },
+  "api": {
+    "wire_version": "UNVERSIONED_IN_AUTHORIZED_SOURCE",
+    "router": "UNVERIFIED",
+    "handlers": [
+      {"name":"ExecuteHandler","signature":"store ExecutionStore, payloads services.PayloadStore, webhooks services.WebhookDispatcher, timeout time.Duration, internalToken string","returns":"gin.HandlerFunc","delegate":"handleSync"},
+      {"name":"ExecuteAsyncHandler","signature":"store ExecutionStore, payloads services.PayloadStore, webhooks services.WebhookDispatcher, timeout time.Duration, internalToken string","returns":"gin.HandlerFunc","delegate":"handleAsync"},
+      {"name":"GetExecutionStatusHandler","signature":"store ExecutionStore","returns":"gin.HandlerFunc","delegate":"handleStatus"},
+      {"name":"BatchExecutionStatusHandler","signature":"store ExecutionStore","returns":"gin.HandlerFunc","delegate":"handleBatchStatus"},
+      {"name":"ExecuteHandlerWithARD","signature":"store ExecutionStore, payloads services.PayloadStore, webhooks services.WebhookDispatcher, timeout time.Duration, internalToken string, readARDConfig func() config.ARDConfig","returns":"gin.HandlerFunc","delegate":"handleSync"},
+      {"name":"UpdateExecutionStatusHandler","signature":"store ExecutionStore, payloads services.PayloadStore, webhooks services.WebhookDispatcher, timeout time.Duration","returns":"gin.HandlerFunc","delegate":"handleStatusUpdate"}
+    ],
+    "dtos": [
+      {"name":"ExecuteRequest","fields":[["Input","map[string]interface{}","input",false,""],["Context","map[string]interface{}","context",true,""],["Webhook","*WebhookRequest","webhook",true,""],["RunMetadata","*RunMetadataInput","run_metadata",true,""]]},
+      {"name":"WebhookRequest","fields":[["URL","string","url",false,""],["Secret","string","secret",true,""],["Headers","map[string]string","headers",true,""]]},
+      {"name":"ExecuteResponse","fields":[["ExecutionID","string","execution_id",false,""],["RunID","string","run_id",false,""],["Status","string","status",false,""],["Result","interface{}","result",true,""],["ErrorMessage","*string","error_message",true,""],["ErrorDetails","interface{}","error_details",true,""],["DurationMS","int64","duration_ms",false,""],["FinishedAt","string","finished_at",false,""],["WebhookRegistered","bool","webhook_registered",true,""]]},
+      {"name":"AsyncExecuteResponse","fields":[["ExecutionID","string","execution_id",false,""],["RunID","string","run_id",false,""],["WorkflowID","string","workflow_id",false,""],["Status","string","status",false,""],["Target","string","target",false,""],["Type","string","type",false,""],["CreatedAt","string","created_at",false,""],["EnqueuedAt","string","enqueued_at",true,""],["WebhookRegistered","bool","webhook_registered",false,""],["WebhookError","*string","webhook_error",true,""]]},
+      {"name":"ExecutionStatusResponse","fields":[["ExecutionID","string","execution_id",false,""],["RunID","string","run_id",false,""],["AgentNodeID","string","agent_node_id",true,""],["InstanceID","string","instance_id",true,""],["Status","string","status",false,""],["StatusReason","*string","status_reason",true,""],["Result","interface{}","result",true,""],["Error","*string","error",true,""],["ErrorDetails","interface{}","error_details",true,""],["StartedAt","string","started_at",false,""],["CompletedAt","*string","completed_at",true,""],["DurationMS","*int64","duration_ms",true,""],["WebhookRegistered","bool","webhook_registered",false,""],["WebhookEvents","[]*types.ExecutionWebhookEvent","webhook_events",true,""],["ApprovalRequestID","*string","approval_request_id",true,""],["ApprovalStatus","*string","approval_status",true,""],["ApprovalRequestURL","*string","approval_request_url",true,""]]},
+      {"name":"BatchStatusRequest","fields":[["ExecutionIDs","[]string","execution_ids",false,"required"]]},
+      {"name":"executionStatusUpdateRequest","fields":[["Status","string","status",false,"required"],["StatusReason","*string","status_reason",true,""],["Result","map[string]interface{}","result",true,""],["Error","string","error",true,""],["DurationMS","*int64","duration_ms",true,""],["CompletedAt","*time.Time","completed_at",true,""],["Progress","*int","progress",true,""],["ErrorStatusCode","*int","error_status_code",true,""],["Usage","map[string]interface{}","usage",true,""]]}
+    ],
+    "field_tuple": ["Go name","Go type","JSON name","omitempty (not business optionality)","binding"],
+    "aliases": ["type BatchStatusResponse map[string]ExecutionStatusResponse"],
+    "storage_interface": [
+      "LookupAsyncExecutionIdempotency(ctx context.Context, scopeKey, target, requestKey, bodyDigest string) (*AsyncExecutionIdempotencyResult, error)",
+      "CreateAsyncExecutionIdempotent(ctx context.Context, scopeKey, target, requestKey, bodyDigest string, execution *types.Execution) (*AsyncExecutionIdempotencyResult, error)"
+    ]
+  },
+  "protocol": {
+    "header":"Idempotency-Key",
+    "max_key_bytes":255,
+    "ascii_range":[33,126],
+    "digest":"SHA-256 of raw request body bytes; includes whitespace and run_metadata",
+    "scope":"trimmed verified caller DID + NUL + trimmed target DID",
+    "unique_key":["scope_key","request_key"],
+    "conflict_on":["target","body_digest"],
+    "http":{"invalid_key":400,"unauthenticated":401,"unavailable_store":503,"conflict":409,"replay":202,"queued":202},
+    "replay_header":"X-AgentField-Idempotency-Replay",
+    "replay_type":"empty string (Type is not populated but has no omitempty)",
+    "replay_enqueued_at":"CreatedAt, not independently persisted queue time",
+    "queue":"process-local channel; durable binding does not prove restart dispatch",
+    "anchors":[
+      {"source":"handler","text":"maxAsyncIdempotencyKeyLength = 255"},
+      {"source":"handler","text":"character < 0x21 || character > 0x7e"},
+      {"source":"handler","text":"digest := sha256.Sum256(body)"},
+      {"source":"handler","text":"scopeKey:   callerDID + \"\\x00\" + targetDID"},
+      {"source":"handler","text":"code: http.StatusUnauthorized"},
+      {"source":"handler","text":"code: http.StatusServiceUnavailable"},
+      {"source":"handler","text":"ctx.JSON(http.StatusConflict"},
+      {"source":"handler","text":"ctx.Header(\"X-AgentField-Idempotency-Replay\", \"true\")"},
+      {"source":"handler","text":"queue         chan asyncExecutionJob"},
+      {"source":"storage","text":"ON CONFLICT (scope_key, request_key) DO NOTHING"},
+      {"source":"storage","text":"storedTarget != target || storedDigest != bodyDigest"},
+      {"source":"storage","text":"insertExecutionRecordTx(ctx, tx, execution)"},
+      {"source":"storage","text":"if execution == nil"}
+    ]
+  },
+  "diagrams": [
+    {"level":"context","path":"docs/architecture/basefive-r14-C4-context.md","nodes":[
+      {"id":"Caller","label":"Caller / execution client","source":"handler","anchor":"ctx.GetHeader(\"Idempotency-Key\")"},
+      {"id":"Agentfield","label":"Agentfield execution system","source":"handler","anchor":"func ExecuteHandler("},
+      {"id":"Agent","label":"External agent target [referenced]","source":"handler","anchor":"c.callAgent(reqCtx, plan)"}
+    ],"edges":[
+      {"from":"Caller","to":"Agentfield","label":"Execution request / status","source":"handler","anchor":"ctx.ShouldBindJSON(&request)"},
+      {"from":"Agentfield","to":"Agent","label":"Agent call [implementation unverified]","source":"handler","anchor":"c.callAgent(reqCtx, plan)"}
+    ]},
+    {"level":"container","path":"docs/architecture/basefive-r14-container.mmd","nodes":[
+      {"id":"Client","label":"Execution client","source":"handler","anchor":"type ExecuteRequest struct"},
+      {"id":"ControlPlane","label":"Go control plane / Gin handlers","source":"handler","anchor":"gin.HandlerFunc"},
+      {"id":"Database","label":"SQL store [engine / deployment unverified]","source":"storage","anchor":"db.BeginTx(ctx, nil)"},
+      {"id":"Agent","label":"External agent [referenced]","source":"handler","anchor":"c.callAgent(reqCtx, plan)"}
+    ],"edges":[
+      {"from":"Client","to":"ControlPlane","label":"Execute DTOs / status","source":"handler","anchor":"type AsyncExecuteResponse struct"},
+      {"from":"ControlPlane","to":"Database","label":"Optional durable idempotency + execution transaction","source":"storage","anchor":"insertExecutionRecordTx(ctx, tx, execution)"},
+      {"from":"ControlPlane","to":"Agent","label":"Agent call [implementation unverified]","source":"handler","anchor":"c.callAgent(reqCtx, plan)"}
+    ]},
+    {"level":"component","path":"docs/architecture/basefive-r14-component.mmd","nodes":[
+      {"id":"AsyncHandler","label":"executionController.handleAsync","source":"handler","anchor":"func (c *executionController) handleAsync("},
+      {"id":"KeyReader","label":"readAsyncIdempotencyRequest","source":"handler","anchor":"func readAsyncIdempotencyRequest("},
+      {"id":"Adapter","label":"asyncIdempotentExecutionStore","source":"handler","anchor":"type asyncIdempotentExecutionStore struct"},
+      {"id":"DurableStore","label":"LocalStorage / AsyncExecutionIdempotencyStore","source":"storage","anchor":"type AsyncExecutionIdempotencyStore interface"},
+      {"id":"SQL","label":"execution_request_idempotency + executions","source":"storage","anchor":"INSERT INTO executions ("},
+      {"id":"Pool","label":"asyncWorkerPool / process-local queue","source":"handler","anchor":"type asyncWorkerPool struct"}
+    ],"edges":[
+      {"from":"AsyncHandler","to":"KeyReader","label":"Validate key / caller / raw-body digest","source":"handler","anchor":"readAsyncIdempotencyRequest(ctx)"},
+      {"from":"AsyncHandler","to":"DurableStore","label":"Lookup before admission","source":"handler","anchor":"idempotencyStore.LookupAsyncExecutionIdempotency("},
+      {"from":"AsyncHandler","to":"Adapter","label":"Prepare with optional durable adapter","source":"handler","anchor":"prepareCopy.store = &asyncIdempotentExecutionStore{"},
+      {"from":"Adapter","to":"DurableStore","label":"CreateAsyncExecutionIdempotent","source":"handler","anchor":"s.store.CreateAsyncExecutionIdempotent("},
+      {"from":"DurableStore","to":"SQL","label":"Atomic binding + execution insert","source":"storage","anchor":"insertExecutionRecordTx(ctx, tx, execution)"},
+      {"from":"AsyncHandler","to":"Pool","label":"Reserve / submit job","source":"handler","anchor":"pool.submitReserved(job)"}
+    ]}
+  ]
+}

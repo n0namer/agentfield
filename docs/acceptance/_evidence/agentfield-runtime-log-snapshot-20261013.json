@@ -1,0 +1,2854 @@
+{
+  "schema": "agentfield.native-runtime-log-snapshot.v1",
+  "at": "2026-10-13T12:04:22.976Z",
+  "purpose": "Sanitized operational diagnostics, not raw customer payloads",
+  "sources": [
+    {
+      "container": "docker-control-plane-1",
+      "exit_code": 0,
+      "total_lines": 89,
+      "selected": 71
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "exit_code": 0,
+      "total_lines": 1400,
+      "selected": 400
+    }
+  ],
+  "events": [
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:38:28.916222652Z",
+      "level": "error",
+      "message": "2026-10-13T10:38:28.916222652Z {\"level\":\"error\",\"error\":\"prepare stale execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T10:38:28Z\",\"message\":\"failed to mark stale executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:38:28.917920582Z",
+      "level": "error",
+      "message": "2026-10-13T10:38:28.917920582Z {\"level\":\"error\",\"error\":\"prepare stale workflow execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T10:38:28Z\",\"message\":\"failed to mark stale workflow executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:43:28.893722764Z",
+      "level": "error",
+      "message": "2026-10-13T10:43:28.893722764Z {\"level\":\"error\",\"error\":\"prepare stale execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T10:43:28Z\",\"message\":\"failed to mark stale executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:43:28.896369117Z",
+      "level": "error",
+      "message": "2026-10-13T10:43:28.896369117Z {\"level\":\"error\",\"error\":\"prepare stale workflow execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T10:43:28Z\",\"message\":\"failed to mark stale workflow executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:48:28.869570566Z",
+      "level": "error",
+      "message": "2026-10-13T10:48:28.869570566Z {\"level\":\"error\",\"error\":\"prepare stale execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T10:48:28Z\",\"message\":\"failed to mark stale executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:48:28.872778782Z",
+      "level": "error",
+      "message": "2026-10-13T10:48:28.872778782Z {\"level\":\"error\",\"error\":\"prepare stale workflow execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T10:48:28Z\",\"message\":\"failed to mark stale workflow executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:52:36.194359765Z",
+      "level": "warn",
+      "message": "2026-10-13T10:52:36.194359765Z {\"level\":\"warn\",\"error\":\"failed to commit agent heartbeat transaction: context canceled\",\"node_id\":\"demo-go-agent\",\"time\":\"2026-10-13T10:52:36Z\",\"message\":\"failed to persist heartbeat during status update\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:53:28.847889403Z",
+      "level": "error",
+      "message": "2026-10-13T10:53:28.847889403Z {\"level\":\"error\",\"error\":\"prepare stale execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T10:53:28Z\",\"message\":\"failed to mark stale executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:53:28.850201665Z",
+      "level": "error",
+      "message": "2026-10-13T10:53:28.850201665Z {\"level\":\"error\",\"error\":\"prepare stale workflow execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T10:53:28Z\",\"message\":\"failed to mark stale workflow executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:55:59.073627994Z",
+      "level": "info",
+      "message": "2026-10-13T10:55:59.073627994Z {\"level\":\"info\",\"client_ip\":\"172.26.0.1\",\"method\":\"GET\",\"path\":\"/api/v1/registry\",\"status\":404,\"latency\":1.131116,\"error\":\"\",\"time\":\"2026-10-13T10:55:59Z\",\"message\":\"http_request\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:55:59.073683831Z",
+      "level": "info",
+      "message": "2026-10-13T10:55:59.073683831Z {\"level\":\"info\",\"client_ip\":\"172.26.0.1\",\"method\":\"GET\",\"path\":\"/api/v1/agents\",\"status\":404,\"latency\":1.149332,\"error\":\"\",\"time\":\"2026-10-13T10:55:59Z\",\"message\":\"http_request\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:55:59.073690040Z",
+      "level": "info",
+      "message": "2026-10-13T10:55:59.073690040Z {\"level\":\"info\",\"client_ip\":\"172.26.0.1\",\"method\":\"GET\",\"path\":\"/api/v1/discover\",\"status\":404,\"latency\":0.596094,\"error\":\"\",\"time\":\"2026-10-13T10:55:59Z\",\"message\":\"http_request\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:55:59.073693891Z",
+      "level": "info",
+      "message": "2026-10-13T10:55:59.073693891Z {\"level\":\"info\",\"client_ip\":\"172.26.0.1\",\"method\":\"GET\",\"path\":\"/openapi.json\",\"status\":404,\"latency\":0.554489,\"error\":\"\",\"time\":\"2026-10-13T10:55:59Z\",\"message\":\"http_request\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:56:14.215764330Z",
+      "level": "info",
+      "message": "2026-10-13T10:56:14.215764330Z {\"level\":\"info\",\"path\":\"/api/v1/discovery/capabilities\",\"duration\":3.507545,\"format\":\"json\",\"agents\":6,\"reasoners\":76,\"skills\":0,\"cache_hit\":false,\"filters\":{\"agent_ids\":[],\"health\":\"\",\"limit\":100,\"offset\":0,\"reasoner\":\"\",\"skill\":\"\",\"tags\":null},\"time\":\"2026-10-13T10:56:14Z\",\"message\":\"discovery request completed\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:56:40.886305588Z",
+      "level": "info",
+      "message": "2026-10-13T10:56:40.886305588Z {\"level\":\"info\",\"workers\":16,\"queue_capacity\":1024,\"time\":\"2026-10-13T10:56:40Z\",\"message\":\"async execution worker pool initialized\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:56:40.922583854Z",
+      "level": "info",
+      "message": "2026-10-13T10:56:40.922583854Z {\"level\":\"info\",\"execution_id\":\"exec_20261013_105640_weipeuj5\",\"agent\":\"demo-go-agent\",\"reasoner\":\"demo_echo\",\"time\":\"2026-10-13T10:56:40Z\",\"message\":\"agent acknowledged async execution\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:56:40.922614751Z",
+      "level": "info",
+      "message": "2026-10-13T10:56:40.922614751Z {\"level\":\"info\",\"execution_id\":\"exec_20261013_105640_weipeuj5\",\"time\":\"2026-10-13T10:56:40Z\",\"message\":\"agent accepted execution for async processing\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:56:40.924978511Z",
+      "level": "warn",
+      "message": "2026-10-13T10:56:40.924978511Z {\"level\":\"warn\",\"x_caller_agent_id_present\":true,\"x_agent_node_id_present\":false,\"time\":\"2026-10-13T10:56:40Z\",\"message\":\"Permission middleware: caller identity headers ignored without a verified DID, treating caller as anonymous\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:56:40.948343278Z",
+      "level": "info",
+      "message": "2026-10-13T10:56:40.948343278Z {\"level\":\"info\",\"execution_id\":\"exec_20261013_105640_xvccstse\",\"agent\":\"demo-go-agent\",\"reasoner\":\"say_hello\",\"time\":\"2026-10-13T10:56:40Z\",\"message\":\"agent acknowledged async execution\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:56:40.948407308Z",
+      "level": "info",
+      "message": "2026-10-13T10:56:40.948407308Z {\"level\":\"info\",\"execution_id\":\"exec_20261013_105640_xvccstse\",\"time\":\"2026-10-13T10:56:40Z\",\"message\":\"agent accepted execution for async processing\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:56:40.949787531Z",
+      "level": "warn",
+      "message": "2026-10-13T10:56:40.949787531Z {\"level\":\"warn\",\"x_caller_agent_id_present\":true,\"x_agent_node_id_present\":false,\"time\":\"2026-10-13T10:56:40Z\",\"message\":\"Permission middleware: caller identity headers ignored without a verified DID, treating caller as anonymous\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:56:40.972412185Z",
+      "level": "info",
+      "message": "2026-10-13T10:56:40.972412185Z {\"level\":\"info\",\"execution_id\":\"exec_20261013_105640_2dbs73cc\",\"agent\":\"demo-go-agent\",\"reasoner\":\"add_emoji\",\"time\":\"2026-10-13T10:56:40Z\",\"message\":\"agent acknowledged async execution\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:56:40.972430826Z",
+      "level": "info",
+      "message": "2026-10-13T10:56:40.972430826Z {\"level\":\"info\",\"execution_id\":\"exec_20261013_105640_2dbs73cc\",\"time\":\"2026-10-13T10:56:40Z\",\"message\":\"agent accepted execution for async processing\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:57:16.313002339Z",
+      "level": "info",
+      "message": "2026-10-13T10:57:16.313002339Z {\"level\":\"info\",\"execution_id\":\"exec_20261013_105716_kuzqxkzm\",\"agent\":\"demo-go-agent\",\"reasoner\":\"demo_echo\",\"time\":\"2026-10-13T10:57:16Z\",\"message\":\"agent acknowledged async execution\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:57:16.313031118Z",
+      "level": "info",
+      "message": "2026-10-13T10:57:16.313031118Z {\"level\":\"info\",\"execution_id\":\"exec_20261013_105716_kuzqxkzm\",\"time\":\"2026-10-13T10:57:16Z\",\"message\":\"agent accepted execution for async processing\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:57:16.313581268Z",
+      "level": "warn",
+      "message": "2026-10-13T10:57:16.313581268Z {\"level\":\"warn\",\"x_caller_agent_id_present\":true,\"x_agent_node_id_present\":false,\"time\":\"2026-10-13T10:57:16Z\",\"message\":\"Permission middleware: caller identity headers ignored without a verified DID, treating caller as anonymous\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:57:16.331259314Z",
+      "level": "info",
+      "message": "2026-10-13T10:57:16.331259314Z {\"level\":\"info\",\"execution_id\":\"exec_20261013_105716_wwqjwtf8\",\"agent\":\"demo-go-agent\",\"reasoner\":\"say_hello\",\"time\":\"2026-10-13T10:57:16Z\",\"message\":\"agent acknowledged async execution\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:57:16.331280588Z",
+      "level": "info",
+      "message": "2026-10-13T10:57:16.331280588Z {\"level\":\"info\",\"execution_id\":\"exec_20261013_105716_wwqjwtf8\",\"time\":\"2026-10-13T10:57:16Z\",\"message\":\"agent accepted execution for async processing\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:57:16.331780861Z",
+      "level": "warn",
+      "message": "2026-10-13T10:57:16.331780861Z {\"level\":\"warn\",\"x_caller_agent_id_present\":true,\"x_agent_node_id_present\":false,\"time\":\"2026-10-13T10:57:16Z\",\"message\":\"Permission middleware: caller identity headers ignored without a verified DID, treating caller as anonymous\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:57:16.354940369Z",
+      "level": "info",
+      "message": "2026-10-13T10:57:16.354940369Z {\"level\":\"info\",\"execution_id\":\"exec_20261013_105716_ucyjvvam\",\"agent\":\"demo-go-agent\",\"reasoner\":\"add_emoji\",\"time\":\"2026-10-13T10:57:16Z\",\"message\":\"agent acknowledged async execution\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:57:16.355004817Z",
+      "level": "info",
+      "message": "2026-10-13T10:57:16.355004817Z {\"level\":\"info\",\"execution_id\":\"exec_20261013_105716_ucyjvvam\",\"time\":\"2026-10-13T10:57:16Z\",\"message\":\"agent accepted execution for async processing\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:58:28.824297831Z",
+      "level": "error",
+      "message": "2026-10-13T10:58:28.824297831Z {\"level\":\"error\",\"error\":\"prepare stale execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T10:58:28Z\",\"message\":\"failed to mark stale executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:58:28.826238788Z",
+      "level": "error",
+      "message": "2026-10-13T10:58:28.826238788Z {\"level\":\"error\",\"error\":\"prepare stale workflow execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T10:58:28Z\",\"message\":\"failed to mark stale workflow executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:58:36.166326925Z",
+      "level": "error",
+      "message": "2026-10-13T10:58:36.166326925Z {\"level\":\"error\",\"error\":\"failed to persist status: failed to update health status: failed to commit agent health status transaction: context canceled\",\"node_id\":\"demo-go-agent\",\"time\":\"2026-10-13T10:58:36Z\",\"message\":\"failed to update agent status from lease handler\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T10:58:36.166353335Z",
+      "level": "error",
+      "message": "2026-10-13T10:58:36.166353335Z {\"level\":\"error\",\"client_ip\":\"172.26.0.2\",\"method\":\"PATCH\",\"path\":\"/api/v1/nodes/demo-go-agent/status\",\"status\":500,\"latency\":5000.082748,\"error\":\"\",\"time\":\"2026-10-13T10:58:36Z\",\"message\":\"http_request\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:03:28.799980154Z",
+      "level": "error",
+      "message": "2026-10-13T11:03:28.799980154Z {\"level\":\"error\",\"error\":\"prepare stale execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:03:28Z\",\"message\":\"failed to mark stale executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:03:28.801403256Z",
+      "level": "error",
+      "message": "2026-10-13T11:03:28.801403256Z {\"level\":\"error\",\"error\":\"prepare stale workflow execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:03:28Z\",\"message\":\"failed to mark stale workflow executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:06:54.664513988Z",
+      "level": "info",
+      "message": "2026-10-13T11:06:54.664513988Z {\"level\":\"info\",\"execution_id\":\"exec_20261013_110654_nynu85bf\",\"agent\":\"demo-go-agent\",\"reasoner\":\"demo_echo\",\"time\":\"2026-10-13T11:06:54Z\",\"message\":\"agent acknowledged async execution\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:06:54.664559055Z",
+      "level": "info",
+      "message": "2026-10-13T11:06:54.664559055Z {\"level\":\"info\",\"execution_id\":\"exec_20261013_110654_nynu85bf\",\"time\":\"2026-10-13T11:06:54Z\",\"message\":\"agent accepted execution for async processing\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:06:54.666716748Z",
+      "level": "warn",
+      "message": "2026-10-13T11:06:54.666716748Z {\"level\":\"warn\",\"x_caller_agent_id_present\":true,\"x_agent_node_id_present\":false,\"time\":\"2026-10-13T11:06:54Z\",\"message\":\"Permission middleware: caller identity headers ignored without a verified DID, treating caller as anonymous\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:06:54.694047079Z",
+      "level": "info",
+      "message": "2026-10-13T11:06:54.694047079Z {\"level\":\"info\",\"execution_id\":\"exec_20261013_110654_tgkonwt5\",\"agent\":\"demo-go-agent\",\"reasoner\":\"say_hello\",\"time\":\"2026-10-13T11:06:54Z\",\"message\":\"agent acknowledged async execution\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:06:54.694084662Z",
+      "level": "info",
+      "message": "2026-10-13T11:06:54.694084662Z {\"level\":\"info\",\"execution_id\":\"exec_20261013_110654_tgkonwt5\",\"time\":\"2026-10-13T11:06:54Z\",\"message\":\"agent accepted execution for async processing\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:06:54.694621150Z",
+      "level": "warn",
+      "message": "2026-10-13T11:06:54.694621150Z {\"level\":\"warn\",\"x_caller_agent_id_present\":true,\"x_agent_node_id_present\":false,\"time\":\"2026-10-13T11:06:54Z\",\"message\":\"Permission middleware: caller identity headers ignored without a verified DID, treating caller as anonymous\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:06:54.715748204Z",
+      "level": "info",
+      "message": "2026-10-13T11:06:54.715748204Z {\"level\":\"info\",\"execution_id\":\"exec_20261013_110654_qnfb4d4x\",\"agent\":\"demo-go-agent\",\"reasoner\":\"add_emoji\",\"time\":\"2026-10-13T11:06:54Z\",\"message\":\"agent acknowledged async execution\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:06:54.715759204Z",
+      "level": "info",
+      "message": "2026-10-13T11:06:54.715759204Z {\"level\":\"info\",\"execution_id\":\"exec_20261013_110654_qnfb4d4x\",\"time\":\"2026-10-13T11:06:54Z\",\"message\":\"agent accepted execution for async processing\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:08:28.773971240Z",
+      "level": "error",
+      "message": "2026-10-13T11:08:28.773971240Z {\"level\":\"error\",\"error\":\"prepare stale execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:08:28Z\",\"message\":\"failed to mark stale executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:08:28.776096900Z",
+      "level": "error",
+      "message": "2026-10-13T11:08:28.776096900Z {\"level\":\"error\",\"error\":\"prepare stale workflow execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:08:28Z\",\"message\":\"failed to mark stale workflow executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:13:28.746206942Z",
+      "level": "error",
+      "message": "2026-10-13T11:13:28.746206942Z {\"level\":\"error\",\"error\":\"prepare stale execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:13:28Z\",\"message\":\"failed to mark stale executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:13:28.748266689Z",
+      "level": "error",
+      "message": "2026-10-13T11:13:28.748266689Z {\"level\":\"error\",\"error\":\"prepare stale workflow execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:13:28Z\",\"message\":\"failed to mark stale workflow executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:18:28.719355099Z",
+      "level": "error",
+      "message": "2026-10-13T11:18:28.719355099Z {\"level\":\"error\",\"error\":\"prepare stale execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:18:28Z\",\"message\":\"failed to mark stale executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:18:28.721869716Z",
+      "level": "error",
+      "message": "2026-10-13T11:18:28.721869716Z {\"level\":\"error\",\"error\":\"prepare stale workflow execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:18:28Z\",\"message\":\"failed to mark stale workflow executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:23:28.694547223Z",
+      "level": "error",
+      "message": "2026-10-13T11:23:28.694547223Z {\"level\":\"error\",\"error\":\"prepare stale execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:23:28Z\",\"message\":\"failed to mark stale executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:23:28.696161750Z",
+      "level": "error",
+      "message": "2026-10-13T11:23:28.696161750Z {\"level\":\"error\",\"error\":\"prepare stale workflow execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:23:28Z\",\"message\":\"failed to mark stale workflow executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:28:28.673510300Z",
+      "level": "error",
+      "message": "2026-10-13T11:28:28.673510300Z {\"level\":\"error\",\"error\":\"prepare stale execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:28:28Z\",\"message\":\"failed to mark stale executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:28:28.675875423Z",
+      "level": "error",
+      "message": "2026-10-13T11:28:28.675875423Z {\"level\":\"error\",\"error\":\"prepare stale workflow execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:28:28Z\",\"message\":\"failed to mark stale workflow executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:28:36.016425291Z",
+      "level": "error",
+      "message": "2026-10-13T11:28:36.016425291Z {\"level\":\"error\",\"error\":\"failed to persist status: failed to update lifecycle status: failed to commit agent lifecycle status transaction: context canceled\",\"node_id\":\"demo-go-agent\",\"time\":\"2026-10-13T11:28:36Z\",\"message\":\"failed to update agent status from lease handler\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:28:36.016434165Z",
+      "level": "error",
+      "message": "2026-10-13T11:28:36.016434165Z {\"level\":\"error\",\"client_ip\":\"172.26.0.2\",\"method\":\"PATCH\",\"path\":\"/api/v1/nodes/demo-go-agent/status\",\"status\":500,\"latency\":5001.438823,\"error\":\"\",\"time\":\"2026-10-13T11:28:36Z\",\"message\":\"http_request\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:33:28.654417072Z",
+      "level": "error",
+      "message": "2026-10-13T11:33:28.654417072Z {\"level\":\"error\",\"error\":\"prepare stale execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:33:28Z\",\"message\":\"failed to mark stale executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:33:28.654422779Z",
+      "level": "error",
+      "message": "2026-10-13T11:33:28.654422779Z {\"level\":\"error\",\"error\":\"prepare stale workflow execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:33:28Z\",\"message\":\"failed to mark stale workflow executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:38:28.634155542Z",
+      "level": "error",
+      "message": "2026-10-13T11:38:28.634155542Z {\"level\":\"error\",\"error\":\"prepare stale execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:38:28Z\",\"message\":\"failed to mark stale executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:38:28.636543112Z",
+      "level": "error",
+      "message": "2026-10-13T11:38:28.636543112Z {\"level\":\"error\",\"error\":\"prepare stale workflow execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:38:28Z\",\"message\":\"failed to mark stale workflow executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:43:28.608400621Z",
+      "level": "error",
+      "message": "2026-10-13T11:43:28.608400621Z {\"level\":\"error\",\"error\":\"prepare stale execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:43:28Z\",\"message\":\"failed to mark stale executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:43:28.610015137Z",
+      "level": "error",
+      "message": "2026-10-13T11:43:28.610015137Z {\"level\":\"error\",\"error\":\"prepare stale workflow execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:43:28Z\",\"message\":\"failed to mark stale workflow executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:48:28.589075929Z",
+      "level": "error",
+      "message": "2026-10-13T11:48:28.589075929Z {\"level\":\"error\",\"error\":\"prepare stale execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:48:28Z\",\"message\":\"failed to mark stale executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:48:28.591671272Z",
+      "level": "error",
+      "message": "2026-10-13T11:48:28.591671272Z {\"level\":\"error\",\"error\":\"prepare stale workflow execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:48:28Z\",\"message\":\"failed to mark stale workflow executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:53:28.569635125Z",
+      "level": "error",
+      "message": "2026-10-13T11:53:28.569635125Z {\"level\":\"error\",\"error\":\"prepare stale execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:53:28Z\",\"message\":\"failed to mark stale executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:53:28.572478240Z",
+      "level": "error",
+      "message": "2026-10-13T11:53:28.572478240Z {\"level\":\"error\",\"error\":\"prepare stale workflow execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:53:28Z\",\"message\":\"failed to mark stale workflow executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:58:28.545992244Z",
+      "level": "error",
+      "message": "2026-10-13T11:58:28.545992244Z {\"level\":\"error\",\"error\":\"prepare stale execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:58:28Z\",\"message\":\"failed to mark stale executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T11:58:28.547998010Z",
+      "level": "error",
+      "message": "2026-10-13T11:58:28.547998010Z {\"level\":\"error\",\"error\":\"prepare stale workflow execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T11:58:28Z\",\"message\":\"failed to mark stale workflow executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T12:03:28.532551308Z",
+      "level": "error",
+      "message": "2026-10-13T12:03:28.532551308Z {\"level\":\"error\",\"error\":\"prepare stale execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T12:03:28Z\",\"message\":\"failed to mark stale executions as timed out\"}"
+    },
+    {
+      "container": "docker-control-plane-1",
+      "time": "2026-10-13T12:03:28.535501640Z",
+      "level": "error",
+      "message": "2026-10-13T12:03:28.535501640Z {\"level\":\"error\",\"error\":\"prepare stale workflow execution update: ERROR: syntax error at or near \\\",\\\" (SQLSTATE 42601)\",\"time\":\"2026-10-13T12:03:28Z\",\"message\":\"failed to mark stale workflow executions as timed out\"}"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:24.956103388Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:24.956103388Z 2026/10/13 11:29:24 [demo-go-agent] demo stdout-class log 4217"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:24.956132738Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:24.956132738Z [demo-go-agent] demo stderr line 4217"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:27.956441138Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:27.956441138Z 2026/10/13 11:29:27 [demo-go-agent] demo stdout-class log 4218"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:27.956481776Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:27.956481776Z [demo-go-agent] demo stderr line 4218"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:30.955595361Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:30.955595361Z 2026/10/13 11:29:30 [demo-go-agent] demo stdout-class log 4219"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:30.955628707Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:30.955628707Z [demo-go-agent] demo stderr line 4219"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:33.953914161Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:33.953914161Z 2026/10/13 11:29:33 [demo-go-agent] demo stdout-class log 4220"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:33.953946140Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:33.953946140Z [demo-go-agent] demo stderr line 4220"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:36.954811087Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:36.954811087Z 2026/10/13 11:29:36 [demo-go-agent] demo stdout-class log 4221"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:36.954848434Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:36.954848434Z [demo-go-agent] demo stderr line 4221"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:39.954863818Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:39.954863818Z 2026/10/13 11:29:39 [demo-go-agent] demo stdout-class log 4222"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:39.954894794Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:39.954894794Z [demo-go-agent] demo stderr line 4222"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:42.955950058Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:42.955950058Z 2026/10/13 11:29:42 [demo-go-agent] demo stdout-class log 4223"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:42.955987036Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:42.955987036Z [demo-go-agent] demo stderr line 4223"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:45.955563369Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:45.955563369Z 2026/10/13 11:29:45 [demo-go-agent] demo stdout-class log 4224"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:45.955592239Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:45.955592239Z [demo-go-agent] demo stderr line 4224"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:48.952246625Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:48.952246625Z 2026/10/13 11:29:48 [demo-go-agent] demo stdout-class log 4225"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:48.952282697Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:48.952282697Z [demo-go-agent] demo stderr line 4225"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:51.954334755Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:51.954334755Z 2026/10/13 11:29:51 [demo-go-agent] demo stdout-class log 4226"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:51.954366530Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:51.954366530Z [demo-go-agent] demo stderr line 4226"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:54.953750400Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:54.953750400Z 2026/10/13 11:29:54 [demo-go-agent] demo stdout-class log 4227"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:54.953781508Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:54.953781508Z [demo-go-agent] demo stderr line 4227"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:57.952909970Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:57.952909970Z 2026/10/13 11:29:57 [demo-go-agent] demo stdout-class log 4228"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:29:57.952935823Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:29:57.952935823Z [demo-go-agent] demo stderr line 4228"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:00.953319352Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:00.953319352Z 2026/10/13 11:30:00 [demo-go-agent] demo stdout-class log 4229"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:00.953352620Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:00.953352620Z [demo-go-agent] demo stderr line 4229"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:03.954278304Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:03.954278304Z 2026/10/13 11:30:03 [demo-go-agent] demo stdout-class log 4230"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:03.954306295Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:03.954306295Z [demo-go-agent] demo stderr line 4230"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:06.954355086Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:06.954355086Z 2026/10/13 11:30:06 [demo-go-agent] demo stdout-class log 4231"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:06.954405520Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:06.954405520Z [demo-go-agent] demo stderr line 4231"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:09.952003802Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:09.952003802Z 2026/10/13 11:30:09 [demo-go-agent] demo stdout-class log 4232"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:09.952035004Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:09.952035004Z [demo-go-agent] demo stderr line 4232"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:12.954224981Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:12.954224981Z 2026/10/13 11:30:12 [demo-go-agent] demo stdout-class log 4233"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:12.954257541Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:12.954257541Z [demo-go-agent] demo stderr line 4233"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:15.954249476Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:15.954249476Z 2026/10/13 11:30:15 [demo-go-agent] demo stdout-class log 4234"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:15.954276601Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:15.954276601Z [demo-go-agent] demo stderr line 4234"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:18.949812041Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:18.949812041Z 2026/10/13 11:30:18 [demo-go-agent] demo stdout-class log 4235"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:18.949858759Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:18.949858759Z [demo-go-agent] demo stderr line 4235"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:21.951933275Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:21.951933275Z 2026/10/13 11:30:21 [demo-go-agent] demo stdout-class log 4236"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:21.951965251Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:21.951965251Z [demo-go-agent] demo stderr line 4236"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:24.952143993Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:24.952143993Z 2026/10/13 11:30:24 [demo-go-agent] demo stdout-class log 4237"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:24.952178422Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:24.952178422Z [demo-go-agent] demo stderr line 4237"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:27.952090123Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:27.952090123Z 2026/10/13 11:30:27 [demo-go-agent] demo stdout-class log 4238"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:27.952117269Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:27.952117269Z [demo-go-agent] demo stderr line 4238"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:30.950411684Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:30.950411684Z 2026/10/13 11:30:30 [demo-go-agent] demo stdout-class log 4239"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:30.950443076Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:30.950443076Z [demo-go-agent] demo stderr line 4239"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:33.951871924Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:33.951871924Z 2026/10/13 11:30:33 [demo-go-agent] demo stdout-class log 4240"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:33.951899139Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:33.951899139Z [demo-go-agent] demo stderr line 4240"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:36.951964765Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:36.951964765Z 2026/10/13 11:30:36 [demo-go-agent] demo stdout-class log 4241"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:36.951993553Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:36.951993553Z [demo-go-agent] demo stderr line 4241"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:39.949544013Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:39.949544013Z 2026/10/13 11:30:39 [demo-go-agent] demo stdout-class log 4242"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:39.949568056Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:39.949568056Z [demo-go-agent] demo stderr line 4242"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:42.951911345Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:42.951911345Z 2026/10/13 11:30:42 [demo-go-agent] demo stdout-class log 4243"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:42.951942114Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:42.951942114Z [demo-go-agent] demo stderr line 4243"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:45.949263935Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:45.949263935Z 2026/10/13 11:30:45 [demo-go-agent] demo stdout-class log 4244"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:45.949290099Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:45.949290099Z [demo-go-agent] demo stderr line 4244"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:48.947583937Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:48.947583937Z 2026/10/13 11:30:48 [demo-go-agent] demo stdout-class log 4245"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:48.947622635Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:48.947622635Z [demo-go-agent] demo stderr line 4245"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:51.949089434Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:51.949089434Z 2026/10/13 11:30:51 [demo-go-agent] demo stdout-class log 4246"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:51.949132575Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:51.949132575Z [demo-go-agent] demo stderr line 4246"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:54.949239070Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:54.949239070Z 2026/10/13 11:30:54 [demo-go-agent] demo stdout-class log 4247"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:54.949268299Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:54.949268299Z [demo-go-agent] demo stderr line 4247"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:57.949449816Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:57.949449816Z 2026/10/13 11:30:57 [demo-go-agent] demo stdout-class log 4248"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:30:57.949507146Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:30:57.949507146Z [demo-go-agent] demo stderr line 4248"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:00.948050193Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:00.948050193Z 2026/10/13 11:31:00 [demo-go-agent] demo stdout-class log 4249"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:00.948081144Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:00.948081144Z [demo-go-agent] demo stderr line 4249"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:03.949303823Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:03.949303823Z 2026/10/13 11:31:03 [demo-go-agent] demo stdout-class log 4250"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:03.949329120Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:03.949329120Z [demo-go-agent] demo stderr line 4250"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:06.948018434Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:06.948018434Z 2026/10/13 11:31:06 [demo-go-agent] demo stdout-class log 4251"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:06.948052295Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:06.948052295Z [demo-go-agent] demo stderr line 4251"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:09.947733592Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:09.947733592Z 2026/10/13 11:31:09 [demo-go-agent] demo stdout-class log 4252"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:09.947772081Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:09.947772081Z [demo-go-agent] demo stderr line 4252"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:12.949875624Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:12.949875624Z 2026/10/13 11:31:12 [demo-go-agent] demo stdout-class log 4253"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:12.949919519Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:12.949919519Z [demo-go-agent] demo stderr line 4253"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:15.949884229Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:15.949884229Z 2026/10/13 11:31:15 [demo-go-agent] demo stdout-class log 4254"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:15.949913802Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:15.949913802Z [demo-go-agent] demo stderr line 4254"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:18.945709179Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:18.945709179Z 2026/10/13 11:31:18 [demo-go-agent] demo stdout-class log 4255"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:18.945743016Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:18.945743016Z [demo-go-agent] demo stderr line 4255"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:21.947724838Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:21.947724838Z 2026/10/13 11:31:21 [demo-go-agent] demo stdout-class log 4256"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:21.947755942Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:21.947755942Z [demo-go-agent] demo stderr line 4256"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:24.947908196Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:24.947908196Z 2026/10/13 11:31:24 [demo-go-agent] demo stdout-class log 4257"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:24.947940348Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:24.947940348Z [demo-go-agent] demo stderr line 4257"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:27.947137421Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:27.947137421Z 2026/10/13 11:31:27 [demo-go-agent] demo stdout-class log 4258"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:27.947172050Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:27.947172050Z [demo-go-agent] demo stderr line 4258"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:30.947036631Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:30.947036631Z 2026/10/13 11:31:30 [demo-go-agent] demo stdout-class log 4259"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:30.947074637Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:30.947074637Z [demo-go-agent] demo stderr line 4259"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:33.945068225Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:33.945068225Z 2026/10/13 11:31:33 [demo-go-agent] demo stdout-class log 4260"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:33.945190999Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:33.945190999Z [demo-go-agent] demo stderr line 4260"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:36.945928381Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:36.945928381Z 2026/10/13 11:31:36 [demo-go-agent] demo stdout-class log 4261"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:36.945984752Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:36.945984752Z [demo-go-agent] demo stderr line 4261"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:39.945454228Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:39.945454228Z 2026/10/13 11:31:39 [demo-go-agent] demo stdout-class log 4262"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:39.945483877Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:39.945483877Z [demo-go-agent] demo stderr line 4262"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:42.946419913Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:42.946419913Z 2026/10/13 11:31:42 [demo-go-agent] demo stdout-class log 4263"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:42.946457214Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:42.946457214Z [demo-go-agent] demo stderr line 4263"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:45.947567204Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:45.947567204Z 2026/10/13 11:31:45 [demo-go-agent] demo stdout-class log 4264"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:45.947594304Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:45.947594304Z [demo-go-agent] demo stderr line 4264"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:48.945060423Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:48.945060423Z 2026/10/13 11:31:48 [demo-go-agent] demo stdout-class log 4265"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:48.945120724Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:48.945120724Z [demo-go-agent] demo stderr line 4265"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:51.943789960Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:51.943789960Z 2026/10/13 11:31:51 [demo-go-agent] demo stdout-class log 4266"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:51.943852850Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:51.943852850Z [demo-go-agent] demo stderr line 4266"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:54.945975088Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:54.945975088Z 2026/10/13 11:31:54 [demo-go-agent] demo stdout-class log 4267"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:54.946011431Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:54.946011431Z [demo-go-agent] demo stderr line 4267"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:57.945929793Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:57.945929793Z 2026/10/13 11:31:57 [demo-go-agent] demo stdout-class log 4268"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:31:57.945968942Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:31:57.945968942Z [demo-go-agent] demo stderr line 4268"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:00.945260052Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:00.945260052Z 2026/10/13 11:32:00 [demo-go-agent] demo stdout-class log 4269"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:00.945299981Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:00.945299981Z [demo-go-agent] demo stderr line 4269"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:03.945795164Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:03.945795164Z 2026/10/13 11:32:03 [demo-go-agent] demo stdout-class log 4270"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:03.945829997Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:03.945829997Z [demo-go-agent] demo stderr line 4270"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:06.946264951Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:06.946264951Z 2026/10/13 11:32:06 [demo-go-agent] demo stdout-class log 4271"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:06.946308409Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:06.946308409Z [demo-go-agent] demo stderr line 4271"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:09.943083469Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:09.943083469Z 2026/10/13 11:32:09 [demo-go-agent] demo stdout-class log 4272"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:09.943196663Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:09.943196663Z [demo-go-agent] demo stderr line 4272"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:12.943214719Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:12.943214719Z 2026/10/13 11:32:12 [demo-go-agent] demo stdout-class log 4273"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:12.943251797Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:12.943251797Z [demo-go-agent] demo stderr line 4273"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:15.945323460Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:15.945323460Z 2026/10/13 11:32:15 [demo-go-agent] demo stdout-class log 4274"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:15.945351697Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:15.945351697Z [demo-go-agent] demo stderr line 4274"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:18.940751481Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:18.940751481Z 2026/10/13 11:32:18 [demo-go-agent] demo stdout-class log 4275"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:18.940786464Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:18.940786464Z [demo-go-agent] demo stderr line 4275"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:21.941129021Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:21.941129021Z 2026/10/13 11:32:21 [demo-go-agent] demo stdout-class log 4276"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:21.941165757Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:21.941165757Z [demo-go-agent] demo stderr line 4276"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:24.943364178Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:24.943364178Z 2026/10/13 11:32:24 [demo-go-agent] demo stdout-class log 4277"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:24.943393065Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:24.943393065Z [demo-go-agent] demo stderr line 4277"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:27.943509126Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:27.943509126Z 2026/10/13 11:32:27 [demo-go-agent] demo stdout-class log 4278"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:27.943551697Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:27.943551697Z [demo-go-agent] demo stderr line 4278"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:30.942536566Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:30.942536566Z 2026/10/13 11:32:30 [demo-go-agent] demo stdout-class log 4279"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:30.942573798Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:30.942573798Z [demo-go-agent] demo stderr line 4279"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:33.940660197Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:33.940660197Z 2026/10/13 11:32:33 [demo-go-agent] demo stdout-class log 4280"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:33.940691417Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:33.940691417Z [demo-go-agent] demo stderr line 4280"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:36.941057145Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:36.941057145Z 2026/10/13 11:32:36 [demo-go-agent] demo stdout-class log 4281"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:36.941105058Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:36.941105058Z [demo-go-agent] demo stderr line 4281"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:39.941446750Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:39.941446750Z 2026/10/13 11:32:39 [demo-go-agent] demo stdout-class log 4282"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:39.941492690Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:39.941492690Z [demo-go-agent] demo stderr line 4282"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:42.942791197Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:42.942791197Z 2026/10/13 11:32:42 [demo-go-agent] demo stdout-class log 4283"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:42.942828498Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:42.942828498Z [demo-go-agent] demo stderr line 4283"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:45.942832888Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:45.942832888Z 2026/10/13 11:32:45 [demo-go-agent] demo stdout-class log 4284"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:45.942862676Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:45.942862676Z [demo-go-agent] demo stderr line 4284"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:48.938960793Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:48.938960793Z 2026/10/13 11:32:48 [demo-go-agent] demo stdout-class log 4285"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:48.938991355Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:48.938991355Z [demo-go-agent] demo stderr line 4285"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:51.939220070Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:51.939220070Z 2026/10/13 11:32:51 [demo-go-agent] demo stdout-class log 4286"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:51.939253586Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:51.939253586Z [demo-go-agent] demo stderr line 4286"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:54.941331121Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:54.941331121Z 2026/10/13 11:32:54 [demo-go-agent] demo stdout-class log 4287"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:54.942431509Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:54.942431509Z [demo-go-agent] demo stderr line 4287"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:57.938621624Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:57.938621624Z 2026/10/13 11:32:57 [demo-go-agent] demo stdout-class log 4288"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:32:57.938660799Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:32:57.938660799Z [demo-go-agent] demo stderr line 4288"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:00.939147753Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:00.939147753Z 2026/10/13 11:33:00 [demo-go-agent] demo stdout-class log 4289"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:00.939176494Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:00.939176494Z [demo-go-agent] demo stderr line 4289"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:03.941243234Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:03.941243234Z 2026/10/13 11:33:03 [demo-go-agent] demo stdout-class log 4290"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:09.865798887Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:09.865798887Z [demo-go-agent] demo stderr line 4290"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:09.865825340Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:09.865825340Z 2026/10/13 11:33:06 [demo-go-agent] demo stdout-class log 4291"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:09.865827056Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:09.865827056Z [demo-go-agent] demo stderr line 4291"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:09.939780031Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:09.939780031Z 2026/10/13 11:33:09 [demo-go-agent] demo stdout-class log 4292"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:09.939813338Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:09.939813338Z [demo-go-agent] demo stderr line 4292"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:12.938437168Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:12.938437168Z 2026/10/13 11:33:12 [demo-go-agent] demo stdout-class log 4293"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:12.938528797Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:12.938528797Z [demo-go-agent] demo stderr line 4293"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:15.939568255Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:15.939568255Z 2026/10/13 11:33:15 [demo-go-agent] demo stdout-class log 4294"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:15.939614490Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:15.939614490Z [demo-go-agent] demo stderr line 4294"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:18.937079469Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:18.937079469Z 2026/10/13 11:33:18 [demo-go-agent] demo stdout-class log 4295"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:18.937109097Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:18.937109097Z [demo-go-agent] demo stderr line 4295"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:21.938201607Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:21.938201607Z 2026/10/13 11:33:21 [demo-go-agent] demo stdout-class log 4296"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:21.938232544Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:21.938232544Z [demo-go-agent] demo stderr line 4296"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:24.938420703Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:24.938420703Z 2026/10/13 11:33:24 [demo-go-agent] demo stdout-class log 4297"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:24.938451778Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:24.938451778Z [demo-go-agent] demo stderr line 4297"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:27.938641000Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:27.938641000Z 2026/10/13 11:33:27 [demo-go-agent] demo stdout-class log 4298"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:27.938671442Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:27.938671442Z [demo-go-agent] demo stderr line 4298"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:30.938100922Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:30.938100922Z 2026/10/13 11:33:30 [demo-go-agent] demo stdout-class log 4299"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:30.938208875Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:30.938208875Z [demo-go-agent] demo stderr line 4299"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:33.936288924Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:33.936288924Z 2026/10/13 11:33:33 [demo-go-agent] demo stdout-class log 4300"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:33.936555175Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:33.936555175Z [demo-go-agent] demo stderr line 4300"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:36.936970629Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:36.936970629Z 2026/10/13 11:33:36 [demo-go-agent] demo stdout-class log 4301"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:36.937001447Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:36.937001447Z [demo-go-agent] demo stderr line 4301"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:39.936793932Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:39.936793932Z 2026/10/13 11:33:39 [demo-go-agent] demo stdout-class log 4302"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:39.936827347Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:39.936827347Z [demo-go-agent] demo stderr line 4302"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:42.938760587Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:42.938760587Z 2026/10/13 11:33:42 [demo-go-agent] demo stdout-class log 4303"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:42.938792615Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:42.938792615Z [demo-go-agent] demo stderr line 4303"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:45.938818322Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:45.938818322Z 2026/10/13 11:33:45 [demo-go-agent] demo stdout-class log 4304"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:45.938844542Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:45.938844542Z [demo-go-agent] demo stderr line 4304"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:48.934645445Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:48.934645445Z 2026/10/13 11:33:48 [demo-go-agent] demo stdout-class log 4305"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:48.934686558Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:48.934686558Z [demo-go-agent] demo stderr line 4305"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:51.936819483Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:51.936819483Z 2026/10/13 11:33:51 [demo-go-agent] demo stdout-class log 4306"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:51.936859095Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:51.936859095Z [demo-go-agent] demo stderr line 4306"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:54.936743204Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:54.936743204Z 2026/10/13 11:33:54 [demo-go-agent] demo stdout-class log 4307"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:54.936783047Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:54.936783047Z [demo-go-agent] demo stderr line 4307"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:57.936846633Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:57.936846633Z 2026/10/13 11:33:57 [demo-go-agent] demo stdout-class log 4308"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:33:57.936889439Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:33:57.936889439Z [demo-go-agent] demo stderr line 4308"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:00.935458132Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:00.935458132Z 2026/10/13 11:34:00 [demo-go-agent] demo stdout-class log 4309"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:00.935487207Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:00.935487207Z [demo-go-agent] demo stderr line 4309"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:03.935005265Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:03.935005265Z 2026/10/13 11:34:03 [demo-go-agent] demo stdout-class log 4310"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:03.935083849Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:03.935083849Z [demo-go-agent] demo stderr line 4310"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:06.934259398Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:06.934259398Z 2026/10/13 11:34:06 [demo-go-agent] demo stdout-class log 4311"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:06.934294181Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:06.934294181Z [demo-go-agent] demo stderr line 4311"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:09.934725311Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:09.934725311Z 2026/10/13 11:34:09 [demo-go-agent] demo stdout-class log 4312"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:09.934753444Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:09.934753444Z [demo-go-agent] demo stderr line 4312"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:12.936930152Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:12.936930152Z 2026/10/13 11:34:12 [demo-go-agent] demo stdout-class log 4313"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:12.936958677Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:12.936958677Z [demo-go-agent] demo stderr line 4313"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:15.936044941Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:15.936044941Z 2026/10/13 11:34:15 [demo-go-agent] demo stdout-class log 4314"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:15.936074691Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:15.936074691Z [demo-go-agent] demo stderr line 4314"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:18.932078910Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:18.932078910Z 2026/10/13 11:34:18 [demo-go-agent] demo stdout-class log 4315"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:18.932118533Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:18.932118533Z [demo-go-agent] demo stderr line 4315"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:21.934279746Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:21.934279746Z 2026/10/13 11:34:21 [demo-go-agent] demo stdout-class log 4316"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:21.934326801Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:21.934326801Z [demo-go-agent] demo stderr line 4316"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:24.934404009Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:24.934404009Z 2026/10/13 11:34:24 [demo-go-agent] demo stdout-class log 4317"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:24.934446852Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:24.934446852Z [demo-go-agent] demo stderr line 4317"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:27.933652001Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:27.933652001Z 2026/10/13 11:34:27 [demo-go-agent] demo stdout-class log 4318"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:27.933690803Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:27.933690803Z [demo-go-agent] demo stderr line 4318"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:30.933734045Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:30.933734045Z 2026/10/13 11:34:30 [demo-go-agent] demo stdout-class log 4319"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:30.933759872Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:30.933759872Z [demo-go-agent] demo stderr line 4319"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:33.933956006Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:33.933956006Z 2026/10/13 11:34:33 [demo-go-agent] demo stdout-class log 4320"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:33.934010873Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:33.934010873Z [demo-go-agent] demo stderr line 4320"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:36.934025366Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:36.934025366Z 2026/10/13 11:34:36 [demo-go-agent] demo stdout-class log 4321"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:36.934244037Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:36.934244037Z [demo-go-agent] demo stderr line 4321"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:39.932724062Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:39.932724062Z 2026/10/13 11:34:39 [demo-go-agent] demo stdout-class log 4322"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:39.932747679Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:39.932747679Z [demo-go-agent] demo stderr line 4322"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:42.933885533Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:42.933885533Z 2026/10/13 11:34:42 [demo-go-agent] demo stdout-class log 4323"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:42.933911316Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:42.933911316Z [demo-go-agent] demo stderr line 4323"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:45.934139023Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:45.934139023Z 2026/10/13 11:34:45 [demo-go-agent] demo stdout-class log 4324"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:45.934169402Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:45.934169402Z [demo-go-agent] demo stderr line 4324"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:48.929795419Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:48.929795419Z 2026/10/13 11:34:48 [demo-go-agent] demo stdout-class log 4325"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:48.929830021Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:48.929830021Z [demo-go-agent] demo stderr line 4325"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:51.931985468Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:51.931985468Z 2026/10/13 11:34:51 [demo-go-agent] demo stdout-class log 4326"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:51.932016821Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:51.932016821Z [demo-go-agent] demo stderr line 4326"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:54.930612584Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:54.930612584Z 2026/10/13 11:34:54 [demo-go-agent] demo stdout-class log 4327"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:54.930690653Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:54.930690653Z [demo-go-agent] demo stderr line 4327"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:57.930000597Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:57.930000597Z 2026/10/13 11:34:57 [demo-go-agent] demo stdout-class log 4328"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:34:57.930029754Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:34:57.930029754Z [demo-go-agent] demo stderr line 4328"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:00.930000524Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:00.930000524Z 2026/10/13 11:35:00 [demo-go-agent] demo stdout-class log 4329"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:00.930026805Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:00.930026805Z [demo-go-agent] demo stderr line 4329"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:03.932125234Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:03.932125234Z 2026/10/13 11:35:03 [demo-go-agent] demo stdout-class log 4330"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:03.932157141Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:03.932157141Z [demo-go-agent] demo stderr line 4330"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:06.932291704Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:06.932291704Z 2026/10/13 11:35:06 [demo-go-agent] demo stdout-class log 4331"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:06.932320162Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:06.932320162Z [demo-go-agent] demo stderr line 4331"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:09.930540274Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:09.930540274Z 2026/10/13 11:35:09 [demo-go-agent] demo stdout-class log 4332"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:09.930569709Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:09.930569709Z [demo-go-agent] demo stderr line 4332"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:12.931684690Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:12.931684690Z 2026/10/13 11:35:12 [demo-go-agent] demo stdout-class log 4333"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:12.931730565Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:12.931730565Z [demo-go-agent] demo stderr line 4333"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:15.931837943Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:15.931837943Z 2026/10/13 11:35:15 [demo-go-agent] demo stdout-class log 4334"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:15.931864866Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:15.931864866Z [demo-go-agent] demo stderr line 4334"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:18.928008725Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:18.928008725Z 2026/10/13 11:35:18 [demo-go-agent] demo stdout-class log 4335"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:18.928038442Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:18.928038442Z [demo-go-agent] demo stderr line 4335"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:21.930002099Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:21.930002099Z 2026/10/13 11:35:21 [demo-go-agent] demo stdout-class log 4336"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:21.930030018Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:21.930030018Z [demo-go-agent] demo stderr line 4336"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:24.930235594Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:24.930235594Z 2026/10/13 11:35:24 [demo-go-agent] demo stdout-class log 4337"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:24.930265700Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:24.930265700Z [demo-go-agent] demo stderr line 4337"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:27.929434144Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:27.929434144Z 2026/10/13 11:35:27 [demo-go-agent] demo stdout-class log 4338"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:27.929470253Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:27.929470253Z [demo-go-agent] demo stderr line 4338"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:30.929023424Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:30.929023424Z 2026/10/13 11:35:30 [demo-go-agent] demo stdout-class log 4339"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:30.929046976Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:30.929046976Z [demo-go-agent] demo stderr line 4339"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:33.928699868Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:33.928699868Z 2026/10/13 11:35:33 [demo-go-agent] demo stdout-class log 4340"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:33.928931089Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:33.928931089Z [demo-go-agent] demo stderr line 4340"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:36.929480329Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:36.929480329Z 2026/10/13 11:35:36 [demo-go-agent] demo stdout-class log 4341"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:36.929521644Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:36.929521644Z [demo-go-agent] demo stderr line 4341"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:39.928457105Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:39.928457105Z 2026/10/13 11:35:39 [demo-go-agent] demo stdout-class log 4342"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:39.928489382Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:39.928489382Z [demo-go-agent] demo stderr line 4342"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:42.929805536Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:42.929805536Z 2026/10/13 11:35:42 [demo-go-agent] demo stdout-class log 4343"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:42.929836401Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:42.929836401Z [demo-go-agent] demo stderr line 4343"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:45.929974232Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:45.929974232Z 2026/10/13 11:35:45 [demo-go-agent] demo stdout-class log 4344"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:45.930001319Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:45.930001319Z [demo-go-agent] demo stderr line 4344"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:48.926329423Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:48.926329423Z 2026/10/13 11:35:48 [demo-go-agent] demo stdout-class log 4345"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:48.926363412Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:48.926363412Z [demo-go-agent] demo stderr line 4345"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:51.928583463Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:51.928583463Z 2026/10/13 11:35:51 [demo-go-agent] demo stdout-class log 4346"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:51.928611797Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:51.928611797Z [demo-go-agent] demo stderr line 4346"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:54.928572265Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:54.928572265Z 2026/10/13 11:35:54 [demo-go-agent] demo stdout-class log 4347"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:54.928611782Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:54.928611782Z [demo-go-agent] demo stderr line 4347"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:57.928836819Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:57.928836819Z 2026/10/13 11:35:57 [demo-go-agent] demo stdout-class log 4348"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:35:57.928863247Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:35:57.928863247Z [demo-go-agent] demo stderr line 4348"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:00.927653526Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:00.927653526Z 2026/10/13 11:36:00 [demo-go-agent] demo stdout-class log 4349"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:00.927686206Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:00.927686206Z [demo-go-agent] demo stderr line 4349"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:03.928146565Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:03.928146565Z 2026/10/13 11:36:03 [demo-go-agent] demo stdout-class log 4350"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:03.928188589Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:03.928188589Z [demo-go-agent] demo stderr line 4350"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:06.928432382Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:06.928432382Z 2026/10/13 11:36:06 [demo-go-agent] demo stdout-class log 4351"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:06.928464359Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:06.928464359Z [demo-go-agent] demo stderr line 4351"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:09.926744904Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:09.926744904Z 2026/10/13 11:36:09 [demo-go-agent] demo stdout-class log 4352"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:09.926774584Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:09.926774584Z [demo-go-agent] demo stderr line 4352"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:12.928013040Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:12.928013040Z 2026/10/13 11:36:12 [demo-go-agent] demo stdout-class log 4353"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:12.928050063Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:12.928050063Z [demo-go-agent] demo stderr line 4353"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:15.928082908Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:15.928082908Z 2026/10/13 11:36:15 [demo-go-agent] demo stdout-class log 4354"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:15.928113272Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:15.928113272Z [demo-go-agent] demo stderr line 4354"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:18.924016136Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:18.924016136Z 2026/10/13 11:36:18 [demo-go-agent] demo stdout-class log 4355"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:18.924049688Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:18.924049688Z [demo-go-agent] demo stderr line 4355"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:21.926052510Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:21.926052510Z 2026/10/13 11:36:21 [demo-go-agent] demo stdout-class log 4356"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:21.926124176Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:21.926124176Z [demo-go-agent] demo stderr line 4356"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:24.926082414Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:24.926082414Z 2026/10/13 11:36:24 [demo-go-agent] demo stdout-class log 4357"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:24.926165085Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:24.926165085Z [demo-go-agent] demo stderr line 4357"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:27.925492025Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:27.925492025Z 2026/10/13 11:36:27 [demo-go-agent] demo stdout-class log 4358"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:27.925524678Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:27.925524678Z [demo-go-agent] demo stderr line 4358"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:30.925131037Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:30.925131037Z 2026/10/13 11:36:30 [demo-go-agent] demo stdout-class log 4359"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:30.925161062Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:30.925161062Z [demo-go-agent] demo stderr line 4359"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:33.925939799Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:33.925939799Z 2026/10/13 11:36:33 [demo-go-agent] demo stdout-class log 4360"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:33.925967682Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:33.925967682Z [demo-go-agent] demo stderr line 4360"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:36.925884399Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:36.925884399Z 2026/10/13 11:36:36 [demo-go-agent] demo stdout-class log 4361"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:36.925916473Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:36.925916473Z [demo-go-agent] demo stderr line 4361"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:39.924164223Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:39.924164223Z 2026/10/13 11:36:39 [demo-go-agent] demo stdout-class log 4362"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:39.924189959Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:39.924189959Z [demo-go-agent] demo stderr line 4362"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:42.923841536Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:42.923841536Z 2026/10/13 11:36:42 [demo-go-agent] demo stdout-class log 4363"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:42.923873900Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:42.923873900Z [demo-go-agent] demo stderr line 4363"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:45.925966861Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:45.925966861Z 2026/10/13 11:36:45 [demo-go-agent] demo stdout-class log 4364"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:45.925992899Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:45.925992899Z [demo-go-agent] demo stderr line 4364"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:48.921852498Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:48.921852498Z 2026/10/13 11:36:48 [demo-go-agent] demo stdout-class log 4365"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:48.921887396Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:48.921887396Z [demo-go-agent] demo stderr line 4365"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:51.923853682Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:51.923853682Z 2026/10/13 11:36:51 [demo-go-agent] demo stdout-class log 4366"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:51.923881827Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:51.923881827Z [demo-go-agent] demo stderr line 4366"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:54.923829039Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:54.923829039Z 2026/10/13 11:36:54 [demo-go-agent] demo stdout-class log 4367"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:54.923866165Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:54.923866165Z [demo-go-agent] demo stderr line 4367"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:57.923882902Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:57.923882902Z 2026/10/13 11:36:57 [demo-go-agent] demo stdout-class log 4368"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:36:57.923908588Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:36:57.923908588Z [demo-go-agent] demo stderr line 4368"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:00.923040689Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:00.923040689Z 2026/10/13 11:37:00 [demo-go-agent] demo stdout-class log 4369"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:00.923069268Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:00.923069268Z [demo-go-agent] demo stderr line 4369"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:03.923352881Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:03.923352881Z 2026/10/13 11:37:03 [demo-go-agent] demo stdout-class log 4370"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:03.923377187Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:03.923377187Z [demo-go-agent] demo stderr line 4370"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:06.923663864Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:06.923663864Z 2026/10/13 11:37:06 [demo-go-agent] demo stdout-class log 4371"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:06.923694632Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:06.923694632Z [demo-go-agent] demo stderr line 4371"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:09.922168951Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:09.922168951Z 2026/10/13 11:37:09 [demo-go-agent] demo stdout-class log 4372"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:09.922195925Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:09.922195925Z [demo-go-agent] demo stderr line 4372"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:12.923521606Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:12.923521606Z 2026/10/13 11:37:12 [demo-go-agent] demo stdout-class log 4373"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:12.923561059Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:12.923561059Z [demo-go-agent] demo stderr line 4373"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:15.923557821Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:15.923557821Z 2026/10/13 11:37:15 [demo-go-agent] demo stdout-class log 4374"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:15.923590049Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:15.923590049Z [demo-go-agent] demo stderr line 4374"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:18.919198020Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:18.919198020Z 2026/10/13 11:37:18 [demo-go-agent] demo stdout-class log 4375"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:18.919229784Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:18.919229784Z [demo-go-agent] demo stderr line 4375"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:21.921248566Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:21.921248566Z 2026/10/13 11:37:21 [demo-go-agent] demo stdout-class log 4376"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:21.921275261Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:21.921275261Z [demo-go-agent] demo stderr line 4376"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:24.921453105Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:24.921453105Z 2026/10/13 11:37:24 [demo-go-agent] demo stdout-class log 4377"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:24.921486425Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:24.921486425Z [demo-go-agent] demo stderr line 4377"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:27.921725210Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:27.921725210Z 2026/10/13 11:37:27 [demo-go-agent] demo stdout-class log 4378"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:27.921759448Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:27.921759448Z [demo-go-agent] demo stderr line 4378"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:30.920631846Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:30.920631846Z 2026/10/13 11:37:30 [demo-go-agent] demo stdout-class log 4379"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:30.920665002Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:30.920665002Z [demo-go-agent] demo stderr line 4379"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:33.920811504Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:33.920811504Z 2026/10/13 11:37:33 [demo-go-agent] demo stdout-class log 4380"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:33.920847726Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:33.920847726Z [demo-go-agent] demo stderr line 4380"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:36.919146276Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:36.919146276Z 2026/10/13 11:37:36 [demo-go-agent] demo stdout-class log 4381"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:36.919175766Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:36.919175766Z [demo-go-agent] demo stderr line 4381"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:39.920221607Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:39.920221607Z 2026/10/13 11:37:39 [demo-go-agent] demo stdout-class log 4382"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:39.920247166Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:39.920247166Z [demo-go-agent] demo stderr line 4382"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:42.921308390Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:42.921308390Z 2026/10/13 11:37:42 [demo-go-agent] demo stdout-class log 4383"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:42.921336601Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:42.921336601Z [demo-go-agent] demo stderr line 4383"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:45.921217085Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:45.921217085Z 2026/10/13 11:37:45 [demo-go-agent] demo stdout-class log 4384"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:45.921261337Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:45.921261337Z [demo-go-agent] demo stderr line 4384"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:48.917740418Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:48.917740418Z 2026/10/13 11:37:48 [demo-go-agent] demo stdout-class log 4385"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:48.917775122Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:48.917775122Z [demo-go-agent] demo stderr line 4385"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:51.919850142Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:51.919850142Z 2026/10/13 11:37:51 [demo-go-agent] demo stdout-class log 4386"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:51.919884534Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:51.919884534Z [demo-go-agent] demo stderr line 4386"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:54.920134694Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:54.920134694Z 2026/10/13 11:37:54 [demo-go-agent] demo stdout-class log 4387"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:54.920165099Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:54.920165099Z [demo-go-agent] demo stderr line 4387"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:57.920358779Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:57.920358779Z 2026/10/13 11:37:57 [demo-go-agent] demo stdout-class log 4388"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:37:57.920392858Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:37:57.920392858Z [demo-go-agent] demo stderr line 4388"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:00.919160510Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:00.919160510Z 2026/10/13 11:38:00 [demo-go-agent] demo stdout-class log 4389"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:00.919187691Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:00.919187691Z [demo-go-agent] demo stderr line 4389"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:03.919448285Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:03.919448285Z 2026/10/13 11:38:03 [demo-go-agent] demo stdout-class log 4390"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:03.919476974Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:03.919476974Z [demo-go-agent] demo stderr line 4390"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:06.919552342Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:06.919552342Z 2026/10/13 11:38:06 [demo-go-agent] demo stdout-class log 4391"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:06.919594325Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:06.919594325Z [demo-go-agent] demo stderr line 4391"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:09.918360168Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:09.918360168Z 2026/10/13 11:38:09 [demo-go-agent] demo stdout-class log 4392"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:09.918389726Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:09.918389726Z [demo-go-agent] demo stderr line 4392"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:12.919533888Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:12.919533888Z 2026/10/13 11:38:12 [demo-go-agent] demo stdout-class log 4393"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:12.919565315Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:12.919565315Z [demo-go-agent] demo stderr line 4393"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:15.919873448Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:15.919873448Z 2026/10/13 11:38:15 [demo-go-agent] demo stdout-class log 4394"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:15.919900089Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:15.919900089Z [demo-go-agent] demo stderr line 4394"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:18.915248141Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:18.915248141Z 2026/10/13 11:38:18 [demo-go-agent] demo stdout-class log 4395"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:18.915278185Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:18.915278185Z [demo-go-agent] demo stderr line 4395"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:21.917512645Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:21.917512645Z 2026/10/13 11:38:21 [demo-go-agent] demo stdout-class log 4396"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:21.917552503Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:21.917552503Z [demo-go-agent] demo stderr line 4396"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:24.917645991Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:24.917645991Z 2026/10/13 11:38:24 [demo-go-agent] demo stdout-class log 4397"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:24.917679662Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:24.917679662Z [demo-go-agent] demo stderr line 4397"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:27.916903808Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:27.916903808Z 2026/10/13 11:38:27 [demo-go-agent] demo stdout-class log 4398"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:27.916929431Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:27.916929431Z [demo-go-agent] demo stderr line 4398"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:30.916919407Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:30.916919407Z 2026/10/13 11:38:30 [demo-go-agent] demo stdout-class log 4399"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:30.916952520Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:30.916952520Z [demo-go-agent] demo stderr line 4399"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:33.917567794Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:33.917567794Z 2026/10/13 11:38:33 [demo-go-agent] demo stdout-class log 4400"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:33.917597592Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:33.917597592Z [demo-go-agent] demo stderr line 4400"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:36.917579033Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:36.917579033Z 2026/10/13 11:38:36 [demo-go-agent] demo stdout-class log 4401"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:36.917637604Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:36.917637604Z [demo-go-agent] demo stderr line 4401"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:39.915647287Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:39.915647287Z 2026/10/13 11:38:39 [demo-go-agent] demo stdout-class log 4402"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:39.915676703Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:39.915676703Z [demo-go-agent] demo stderr line 4402"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:42.917006825Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:42.917006825Z 2026/10/13 11:38:42 [demo-go-agent] demo stdout-class log 4403"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:42.917064833Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:42.917064833Z [demo-go-agent] demo stderr line 4403"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:45.915226875Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:45.915226875Z 2026/10/13 11:38:45 [demo-go-agent] demo stdout-class log 4404"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:45.915249724Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:45.915249724Z [demo-go-agent] demo stderr line 4404"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:48.913227120Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:48.913227120Z 2026/10/13 11:38:48 [demo-go-agent] demo stdout-class log 4405"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:48.913256990Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:48.913256990Z [demo-go-agent] demo stderr line 4405"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:51.915468937Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:51.915468937Z 2026/10/13 11:38:51 [demo-go-agent] demo stdout-class log 4406"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:51.915500169Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:51.915500169Z [demo-go-agent] demo stderr line 4406"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:54.915785242Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:54.915785242Z 2026/10/13 11:38:54 [demo-go-agent] demo stdout-class log 4407"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:54.915813047Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:54.915813047Z [demo-go-agent] demo stderr line 4407"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:57.916048081Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:57.916048081Z 2026/10/13 11:38:57 [demo-go-agent] demo stdout-class log 4408"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:38:57.916073896Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:38:57.916073896Z [demo-go-agent] demo stderr line 4408"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:39:00.915149055Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:39:00.915149055Z 2026/10/13 11:39:00 [demo-go-agent] demo stdout-class log 4409"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:39:00.915177585Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:39:00.915177585Z [demo-go-agent] demo stderr line 4409"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:39:03.915324492Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:39:03.915324492Z 2026/10/13 11:39:03 [demo-go-agent] demo stdout-class log 4410"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:39:03.915350411Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:39:03.915350411Z [demo-go-agent] demo stderr line 4410"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:39:06.915561098Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:39:06.915561098Z 2026/10/13 11:39:06 [demo-go-agent] demo stdout-class log 4411"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:39:06.915592869Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:39:06.915592869Z [demo-go-agent] demo stderr line 4411"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:39:09.913987581Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:39:09.913987581Z 2026/10/13 11:39:09 [demo-go-agent] demo stdout-class log 4412"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:39:09.914027578Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:39:09.914027578Z [demo-go-agent] demo stderr line 4412"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:39:12.916072427Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:39:12.916072427Z 2026/10/13 11:39:12 [demo-go-agent] demo stdout-class log 4413"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:39:12.916102467Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:39:12.916102467Z [demo-go-agent] demo stderr line 4413"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:39:15.915384507Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:39:15.915384507Z 2026/10/13 11:39:15 [demo-go-agent] demo stdout-class log 4414"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:39:15.915409736Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:39:15.915409736Z [demo-go-agent] demo stderr line 4414"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:39:18.911236161Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:39:18.911236161Z 2026/10/13 11:39:18 [demo-go-agent] demo stdout-class log 4415"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:39:18.911291814Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:39:18.911291814Z [demo-go-agent] demo stderr line 4415"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:39:21.913486078Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:39:21.913486078Z 2026/10/13 11:39:21 [demo-go-agent] demo stdout-class log 4416"
+    },
+    {
+      "container": "docker-demo-go-agent-1",
+      "time": "2026-10-13T11:39:21.913520261Z",
+      "level": "unknown",
+      "message": "2026-10-13T11:39:21.913520261Z [demo-go-agent] demo stderr line 4416"
+    }
+  ],
+  "counts": {
+    "docker-control-plane-1:info": 42,
+    "docker-control-plane-1:error": 40,
+    "docker-control-plane-1:warn": 7,
+    "docker-demo-go-agent-1:unknown": 1400
+  },
+  "limitations": []
+}

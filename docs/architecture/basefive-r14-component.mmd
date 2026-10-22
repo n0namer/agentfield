@@ -1,0 +1,13 @@
+flowchart LR
+  AsyncHandler["executionController.handleAsync"]
+  KeyReader["readAsyncIdempotencyRequest"]
+  Adapter["asyncIdempotentExecutionStore"]
+  DurableStore["LocalStorage / AsyncExecutionIdempotencyStore"]
+  SQL["execution_request_idempotency + executions"]
+  Pool["asyncWorkerPool / process-local queue"]
+  AsyncHandler -->|Validate key / caller / raw-body digest| KeyReader
+  AsyncHandler -->|Lookup before admission| DurableStore
+  AsyncHandler -->|Prepare with optional durable adapter| Adapter
+  Adapter -->|CreateAsyncExecutionIdempotent| DurableStore
+  DurableStore -->|Atomic binding + execution insert| SQL
+  AsyncHandler -->|Reserve / submit job| Pool

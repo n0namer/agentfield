@@ -333,7 +333,14 @@ func (r *Runner) executeWithRetry(ctx context.Context, provider Provider, prompt
 	var lastErr error
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, ctxErr
+		}
+
 		raw, err := provider.Execute(ctx, prompt, opts)
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return raw, ctxErr
+		}
 		if err != nil {
 			lastErr = err
 			if isTransient(err.Error()) && attempt < maxRetries {
@@ -344,6 +351,9 @@ func (r *Runner) executeWithRetry(ctx context.Context, provider Provider, prompt
 				continue
 			}
 			return nil, err
+		}
+		if raw == nil {
+			return nil, fmt.Errorf("nil provider result")
 		}
 
 		if !raw.IsError {

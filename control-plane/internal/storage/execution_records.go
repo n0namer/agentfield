@@ -238,6 +238,13 @@ func (ls *LocalStorage) UpdateExecutionRecord(ctx context.Context, executionID s
 		ls.enrichExecutionWebhook(ctx, current, true)
 		return current, nil
 	}
+	if err := validateExecutionStateTransition(current.Status, updated.Status); err != nil {
+		if transitionErr, ok := err.(*InvalidExecutionStateTransitionError); ok {
+			transitionErr.ExecutionID = executionID
+		}
+		return nil, err
+	}
+
 	updated.UpdatedAt = time.Now().UTC()
 
 	// Serialize notes to JSON

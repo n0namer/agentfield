@@ -907,3 +907,31 @@ func TestCallAgent_HeaderPropagation(t *testing.T) {
 	require.Equal(t, sessionID, receivedHeaders.Get("X-Session-ID"))
 	require.Equal(t, actorID, receivedHeaders.Get("X-Actor-ID"))
 }
+
+func TestExecuteAsyncHandler_RejectsMalformedIdempotencyKeyBeforeAdmission(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	store := newTestExecutionStorage(testRestartAgent("http://agent.example"))
+	router := gin.New()
+	router.POST("/api/v1/execute/async/:target", ExecuteAsyncHandler(store, services.NewFilePayloadStore(t.TempDir()), nil, time.Second, ""))
+
+	cases := []struct {
+		name string
+		key  string
+	}{
+		{name: "empty", key: "   "},
+		{name: "oversized", key: strings.Repeat("k", maxAsyncIdempotencyKeyLength+1)},
+		{name: "control", key: "valid\nkey"},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/execute/async/node-1.reasoner-a", strings.NewReader(`{"input":{}}`))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Idempotency-Key", testCase.key)
+			resp := httptest.NewRecorder()
+			router.ServeHTTP(resp, req)
+
+			require.Equal(t, http.StatusBadRequest, resp.Code)
+			require.Contains(t, resp.Body.String(), "Idempotency-Key")
+		})
+	}
+}

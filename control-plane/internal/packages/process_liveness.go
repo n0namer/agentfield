@@ -81,13 +81,7 @@ func ProcessStartWallClock(pid int) (time.Time, bool) {
 		started, err := time.ParseInLocation("Mon Jan _2 15:04:05 2006", value, time.Local)
 		return started, err == nil
 	case "windows":
-		command := fmt.Sprintf("(Get-Process -Id %d -ErrorAction Stop).StartTime.ToUniversalTime().ToString('o')", pid)
-		value, state := commandProcessStartTimeResult(processIdentityTimeout, "powershell", "-NoProfile", "-NonInteractive", "-Command", command)
-		if state != processIdentityAvailable {
-			return time.Time{}, false
-		}
-		started, err := time.Parse(time.RFC3339Nano, value)
-		return started, err == nil
+		return windowsProcessStartWallClock(pid)
 	default:
 		return time.Time{}, false
 	}
@@ -178,8 +172,7 @@ func currentProcessStartTime(pid int) (string, processIdentityState) {
 	case "darwin":
 		return commandProcessStartTimeResult(processIdentityTimeout, "ps", "-o", "lstart=", "-p", strconv.Itoa(pid))
 	case "windows":
-		command := fmt.Sprintf("(Get-Process -Id %d -ErrorAction Stop).StartTime.ToUniversalTime().ToString('o')", pid)
-		return commandProcessStartTimeResult(processIdentityTimeout, "powershell", "-NoProfile", "-NonInteractive", "-Command", command)
+		return windowsProcessStartTime(pid)
 	default:
 		return "", processIdentityUnavailable
 	}
@@ -292,7 +285,7 @@ func RuntimeProcessAlive(info RuntimeInfo) bool {
 }
 
 // RuntimePIDAlive performs the cheap liveness probe used by status/dashboard
-// reads. Process-start identity can require ps or PowerShell on non-Linux
+// reads. Process-start identity can require an external utility on non-Linux
 // platforms, so it is reserved for maintenance and stop-before-signal paths.
 func RuntimePIDAlive(info RuntimeInfo) bool {
 	if info.PID == nil || *info.PID <= 0 {

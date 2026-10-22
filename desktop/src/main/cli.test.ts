@@ -11,6 +11,9 @@ import {
   parseAfVersion,
   posixPathEntry,
   probeCli,
+  parseWindowsPathValue,
+  normalizeWindowsPathEntry,
+  windowsPathContains,
   registerPosixUserPath,
   selectCli
 } from './cli'
@@ -240,6 +243,19 @@ describe('probeCli', () => {
       responds: false,
       version: null
     })
+  })
+})
+
+describe('Windows user PATH helpers', () => {
+  it('parses registry value types without changing their semantics', () => {
+    expect(parseWindowsPathValue('    Path    REG_SZ    C:\\Tools;D:\\Bin\r\n')).toEqual({ type: 'REG_SZ', value: 'C:\\Tools;D:\\Bin' })
+    expect(parseWindowsPathValue('    Path    REG_EXPAND_SZ    %SystemRoot%\\System32\r\n')).toEqual({ type: 'REG_EXPAND_SZ', value: '%SystemRoot%\\System32' })
+  })
+
+  it('normalizes slash style and trailing separators for comparison', () => {
+    expect(normalizeWindowsPathEntry(' C:/Users/Test/bin\\ ')).toBe('c:\\users\\test\\bin')
+    expect(windowsPathContains(['C:\\Users\\Test\\bin\\'], 'c:/users/test/bin')).toBe(true)
+    expect(windowsPathContains(['C:\\Users\\Test\\bin'], 'C:\\Users\\Test\\other')).toBe(false)
   })
 })
 

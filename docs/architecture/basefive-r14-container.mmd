@@ -1,0 +1,8 @@
+flowchart LR
+  Client["Execution client"]
+  ControlPlane["Go control plane / Gin handlers"]
+  Database["SQL store [engine / deployment unverified]"]
+  Agent["External agent [referenced]"]
+  Client -->|Execute DTOs / status| ControlPlane
+  ControlPlane -->|Optional durable idempotency + execution transaction| Database
+  ControlPlane -->|Agent call [implementation unverified]| Agent

@@ -1,10 +1,14 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -13,7 +17,9 @@ import (
 	"github.com/Agent-Field/agentfield/control-plane/internal/config"
 	"github.com/Agent-Field/agentfield/control-plane/internal/events"
 	"github.com/Agent-Field/agentfield/control-plane/internal/logger"
+	"github.com/Agent-Field/agentfield/control-plane/internal/server/middleware"
 	"github.com/Agent-Field/agentfield/control-plane/internal/services"
+	"github.com/Agent-Field/agentfield/control-plane/internal/storage"
 	"github.com/Agent-Field/agentfield/control-plane/pkg/types"
 
 	"github.com/gin-gonic/gin"
@@ -200,7 +206,114 @@ const (
 	// maxBatchStatusIDs caps the number of execution IDs a single
 	// batch-status request may fetch, matching the storage-layer cap.
 	maxBatchStatusIDs = 500
+
+	maxAsyncIdempotencyKeyLength = 255
 )
+
+type asyncIdempotencyRequest struct {
+	scopeKey   string
+	target     string
+	requestKey string
+	bodyDigest string
+}
+
+type asyncIdempotentExecutionStore struct {
+	ExecutionStore
+	store   storage.AsyncExecutionIdempotencyStore
+	request asyncIdempotencyRequest
+}
+
+type asyncIdempotencyReplayError struct {
+	execution *types.Execution
+}
+
+func (e *asyncIdempotencyReplayError) Error() string {
+	return "async execution idempotency replay"
+}
+
+type asyncIdempotencyConflictError struct{}
+
+func (e *asyncIdempotencyConflictError) Error() string {
+	return "idempotency key was already used with a different request"
+}
+
+type asyncIdempotencyUnavailableError struct{}
+
+func (e *asyncIdempotencyUnavailableError) Error() string {
+	return "durable async idempotency is unavailable"
+}
+
+func (s *asyncIdempotentExecutionStore) CreateExecutionRecord(ctx context.Context, execution *types.Execution) error {
+	result, err := s.store.CreateAsyncExecutionIdempotent(ctx, s.request.scopeKey, s.request.target, s.request.requestKey, s.request.bodyDigest, execution)
+	if err != nil {
+		return err
+	}
+	if result.Conflict {
+		return &asyncIdempotencyConflictError{}
+	}
+	if !result.Created {
+		return &asyncIdempotencyReplayError{execution: result.Execution}
+	}
+	return nil
+}
+
+func readAsyncIdempotencyRequest(ctx *gin.Context) (*asyncIdempotencyRequest, error) {
+	rawKey := ctx.GetHeader("Idempotency-Key")
+	if rawKey == "" {
+		return nil, nil
+	}
+	requestKey := strings.TrimSpace(rawKey)
+	if requestKey == "" {
+		return nil, fmt.Errorf("Idempotency-Key must not be empty")
+	}
+	if len(requestKey) > maxAsyncIdempotencyKeyLength {
+		return nil, fmt.Errorf("Idempotency-Key exceeds %d bytes", maxAsyncIdempotencyKeyLength)
+	}
+	for _, character := range requestKey {
+		if character < 0x21 || character > 0x7e {
+			return nil, fmt.Errorf("Idempotency-Key contains invalid characters")
+		}
+	}
+	callerDID := strings.TrimSpace(middleware.GetVerifiedCallerDID(ctx))
+	if callerDID == "" {
+		return nil, &executionPreconditionError{code: http.StatusUnauthorized, message: "Idempotency-Key requires an authenticated caller", category: ErrorCategoryAgentError, errorCode: "idempotency_caller_required"}
+	}
+	body, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read request body for idempotency: %w", err)
+	}
+	ctx.Request.Body = io.NopCloser(bytes.NewReader(body))
+	digest := sha256.Sum256(body)
+	targetDID := strings.TrimSpace(middleware.GetTargetDID(ctx))
+	return &asyncIdempotencyRequest{
+		scopeKey:   callerDID + "\x00" + targetDID,
+		target:     ctx.Param("target"),
+		requestKey: requestKey,
+		bodyDigest: hex.EncodeToString(digest[:]),
+	}, nil
+}
+
+func writeAsyncIdempotencyResponse(ctx *gin.Context, execution *types.Execution, target string) {
+	if execution == nil {
+		writeExecutionError(ctx, fmt.Errorf("idempotency replay has no execution record"))
+		return
+	}
+	createdAt := execution.CreatedAt.UTC().Format(time.RFC3339)
+	response := AsyncExecuteResponse{
+		ExecutionID:       execution.ExecutionID,
+		RunID:             execution.RunID,
+		WorkflowID:        execution.RunID,
+		Status:            string(execution.Status),
+		Target:            target,
+		CreatedAt:         createdAt,
+		EnqueuedAt:        createdAt,
+		WebhookRegistered: execution.WebhookRegistered,
+	}
+	ctx.Header("X-Execution-ID", execution.ExecutionID)
+	ctx.Header("X-Run-ID", execution.RunID)
+	ctx.Header("X-AgentField-Idempotency-Replay", "true")
+	ctx.JSON(http.StatusAccepted, response)
+}
 
 // ExecuteHandler handles synchronous execution requests.
 func ExecuteHandler(store ExecutionStore, payloads services.PayloadStore, webhooks services.WebhookDispatcher, timeout time.Duration, internalToken string) gin.HandlerFunc {
@@ -431,6 +544,37 @@ func (c *executionController) handleSync(ctx *gin.Context) {
 
 func (c *executionController) handleAsync(ctx *gin.Context) {
 	reqCtx := ctx.Request.Context()
+	idempotencyRequest, err := readAsyncIdempotencyRequest(ctx)
+	if err != nil {
+		if precondition, ok := err.(*executionPreconditionError); ok {
+			writeExecutionError(ctx, precondition)
+		} else {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		}
+		return
+	}
+	var idempotencyStore storage.AsyncExecutionIdempotencyStore
+	if idempotencyRequest != nil {
+		var ok bool
+		idempotencyStore, ok = c.store.(storage.AsyncExecutionIdempotencyStore)
+		if !ok {
+			writeExecutionError(ctx, &executionPreconditionError{code: http.StatusServiceUnavailable, message: "durable async idempotency is unavailable", category: ErrorCategoryAgentError, errorCode: "idempotency_storage_unavailable"})
+			return
+		}
+		lookup, lookupErr := idempotencyStore.LookupAsyncExecutionIdempotency(reqCtx, idempotencyRequest.scopeKey, idempotencyRequest.target, idempotencyRequest.requestKey, idempotencyRequest.bodyDigest)
+		if lookupErr != nil {
+			writeExecutionError(ctx, lookupErr)
+			return
+		}
+		if lookup.Conflict {
+			ctx.JSON(http.StatusConflict, gin.H{"error": "Idempotency-Key was already used with a different request"})
+			return
+		}
+		if lookup.Execution != nil {
+			writeAsyncIdempotencyResponse(ctx, lookup.Execution, idempotencyRequest.target)
+			return
+		}
+	}
 	pool := getAsyncWorkerPool()
 	// A reservation covers preparation, queue wait, and the worker's dispatch. It
 	// is released when the worker job returns (early on an agent HTTP 202 ACK).
@@ -451,8 +595,28 @@ func (c *executionController) handleAsync(ctx *gin.Context) {
 		}
 	}()
 
-	plan, err := c.prepareAsyncExecution(reqCtx, ctx)
+	prepareController := c
+	if idempotencyRequest != nil {
+		prepareCopy := *c
+		prepareCopy.store = &asyncIdempotentExecutionStore{
+			ExecutionStore: c.store,
+			store:          idempotencyStore,
+			request:        *idempotencyRequest,
+		}
+		prepareController = &prepareCopy
+	}
+	plan, err := prepareController.prepareAsyncExecution(reqCtx, ctx)
 	if err != nil {
+		var replay *asyncIdempotencyReplayError
+		if errors.As(err, &replay) {
+			writeAsyncIdempotencyResponse(ctx, replay.execution, idempotencyRequest.target)
+			return
+		}
+		var conflict *asyncIdempotencyConflictError
+		if errors.As(err, &conflict) {
+			ctx.JSON(http.StatusConflict, gin.H{"error": conflict.Error()})
+			return
+		}
 		writeExecutionError(ctx, err)
 		return
 	}
