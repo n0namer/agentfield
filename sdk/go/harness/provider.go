@@ -1,6 +1,11 @@
 package harness
 
-import "context"
+import (
+	"context"
+	"os"
+	"runtime"
+	"strings"
+)
 
 const (
 	// ProviderAforge is the provider name for the Aforge CLI.
@@ -22,15 +27,60 @@ const (
 )
 
 const (
-	// DefaultProvider is the harness provider used when no provider is
-	// configured explicitly and AGENTFIELD_HARNESS_PROVIDER is unset.
-	// AForge is AgentField's native coding harness.
+	// DefaultProvider is retained as the platform-independent fallback for
+	// callers that need a stable provider constant.
 	DefaultProvider = ProviderAforge
 
 	// ProviderEnvVar overrides the default provider process-wide. An
 	// explicitly configured provider still wins over it.
 	ProviderEnvVar = "AGENTFIELD_HARNESS_PROVIDER"
 )
+
+const (
+	DefaultWindowsModel   = "gpt-5.6-luna"
+	DefaultWindowsVariant = "low"
+	DefaultUnixModel      = "broker/fast-coding"
+	// Unix/FCM keeps its existing reasoning default; no variant is invented.
+	DefaultUnixVariant = ""
+)
+
+func platformDefaultsFor(goos string, options Options) Options {
+	if strings.TrimSpace(options.Provider) == "" {
+		if envProvider := strings.TrimSpace(os.Getenv(ProviderEnvVar)); envProvider != "" {
+			options.Provider = envProvider
+		} else if goos == "windows" {
+			options.Provider = ProviderCodex
+		} else {
+			options.Provider = ProviderOpenCode
+		}
+	}
+
+	switch options.Provider {
+	case ProviderCodex:
+		if strings.TrimSpace(options.Model) == "" {
+			options.Model = DefaultWindowsModel
+		}
+		if strings.TrimSpace(options.Variant) == "" {
+			options.Variant = DefaultWindowsVariant
+		}
+	case ProviderOpenCode:
+		if strings.TrimSpace(options.Model) == "" {
+			options.Model = DefaultUnixModel
+		}
+	}
+	return options
+}
+
+func resolveRunnerOptionsFor(goos string, defaults, overrides Options) Options {
+	runner := &Runner{DefaultOptions: defaults}
+	return platformDefaultsFor(goos, runner.mergeOptions(overrides))
+}
+
+// ResolvePlatformDefaults fills unset provider, model, and variant fields.
+// Explicit values and AGENTFIELD_HARNESS_PROVIDER always win.
+func ResolvePlatformDefaults(options Options) Options {
+	return platformDefaultsFor(runtime.GOOS, options)
+}
 
 // Provider is the interface that CLI-based harness providers implement.
 // Each provider knows how to invoke a specific coding agent (opencode,

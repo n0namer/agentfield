@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -54,8 +55,7 @@ type schemaAware interface {
 // The schema parameter should be a JSON Schema as map[string]any. If dest
 // is non-nil, the validated output is unmarshalled into it.
 func (r *Runner) Run(ctx context.Context, prompt string, schema map[string]any, dest any, overrides Options) (*Result, error) {
-	opts := r.mergeOptions(overrides)
-	opts.Provider = ResolveProviderName(opts.Provider)
+	opts := resolveRunnerOptionsFor(runtime.GOOS, r.DefaultOptions, overrides)
 
 	provider, err := r.buildProvider(opts)
 	if err != nil {
