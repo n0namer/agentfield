@@ -50,7 +50,49 @@ type restartExecutionResponse struct {
 }
 
 type workflowRunMetadataStore interface {
-	StoreWorkflowRun(ctx context.Context, run *types.WorkflowRun) error
+	UpdateWorkflowRunMetadata(context.Context, string, func(map[string]json.RawMessage) error) error
+}
+
+type workflowRunMetadataReader interface {
+	GetWorkflowRun(context.Context, string) (*types.WorkflowRun, error)
+}
+
+type executionRestartPointerStore interface {
+	SetExecutionRestartedAs(context.Context, string, string) error
+}
+
+type restartOptions struct {
+	Scope         string
+	Reuse         string
+	Reason        string
+	Fork          bool
+	Input         map[string]interface{}
+	Context       map[string]interface{}
+	Webhook       *WebhookRequest
+	Kind          string
+	ResumeAttempt int
+}
+
+type restartResponseError struct {
+	status  int
+	message string
+	cause   error
+}
+
+func (e *restartResponseError) Error() string {
+	if e.cause != nil {
+		return e.cause.Error()
+	}
+	return e.message
+}
+
+type restartQueueError struct{ stopped bool }
+
+func (e *restartQueueError) Error() string {
+	if e.stopped {
+		return "async execution queue stopped; retry later"
+	}
+	return "async execution queue is full; retry later"
 }
 
 // RestartExecutionHandler starts a new execution/run from an existing workflow
@@ -104,17 +146,48 @@ func (c *executionController) handleRestart(ctx *gin.Context) {
 		return
 	}
 
-	restartExec := sourceExec
-	if scope == "workflow" {
-		root, rootErr := c.findWorkflowRestartRoot(reqCtx, sourceExec.RunID)
-		if rootErr != nil {
-			logger.Logger.Error().Err(rootErr).Str("run_id", sourceExec.RunID).Msg("restart: failed to find workflow root")
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load workflow root"})
+	response, err := c.startRestart(reqCtx, sourceExec, restartOptions{
+		Scope: scope, Reuse: reuse, Reason: req.Reason, Fork: req.Fork,
+		Input: req.Input, Context: req.Context, Webhook: req.Webhook,
+	})
+	if err != nil {
+		var responseErr *restartResponseError
+		if errors.As(err, &responseErr) {
+			if responseErr.cause != nil {
+				logger.Logger.Error().Err(responseErr.cause).Str("run_id", sourceExec.RunID).Msg("restart: failed to find workflow root")
+			}
+			ctx.JSON(responseErr.status, gin.H{"error": responseErr.message})
 			return
 		}
-		if root == nil {
-			ctx.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("run %s not found", sourceExec.RunID)})
+		var queueErr *restartQueueError
+		if errors.As(err, &queueErr) {
+			if queueErr.stopped {
+				writeExecutionError(ctx, newControlPlaneShutdownError(queueErr.Error()))
+				return
+			}
+			writeAsyncAdmissionError(ctx, http.StatusServiceUnavailable, queueErr.Error())
 			return
+		}
+		writeExecutionError(ctx, err)
+		return
+	}
+	ctx.Header("X-Execution-ID", response.ExecutionID)
+	ctx.Header("X-Run-ID", response.RunID)
+	ctx.JSON(http.StatusAccepted, response)
+}
+
+func (c *executionController) startRestart(ctx context.Context, sourceExec *types.Execution, opts restartOptions) (*restartExecutionResponse, error) {
+	if sourceExec == nil {
+		return nil, fmt.Errorf("source execution is required")
+	}
+	restartExec := sourceExec
+	if opts.Scope == "workflow" {
+		root, err := c.findWorkflowRestartRoot(ctx, sourceExec.RunID)
+		if err != nil {
+			return nil, &restartResponseError{status: http.StatusInternalServerError, message: "failed to load workflow root", cause: err}
+		}
+		if root == nil {
+			return nil, &restartResponseError{status: http.StatusNotFound, message: fmt.Sprintf("run %s not found", sourceExec.RunID)}
 		}
 		restartExec = root
 	}
@@ -124,99 +197,89 @@ func (c *executionController) handleRestart(ctx *gin.Context) {
 	if input == nil {
 		input = map[string]interface{}{}
 	}
-	if req.Input != nil {
-		input = req.Input
+	if opts.Input != nil {
+		input = opts.Input
 	}
 	contextPayload := stored.Context
-	if req.Context != nil {
-		contextPayload = req.Context
+	if opts.Context != nil {
+		contextPayload = opts.Context
 	}
 
-	newRunID := utils.GenerateRunID()
 	headers := executionHeaders{
-		runID:                   newRunID,
-		sessionID:               restartExec.SessionID,
-		actorID:                 restartExec.ActorID,
-		replaySourceRunID:       sourceExec.RunID,
-		replayBeforeExecutionID: sourceExec.ExecutionID,
-		replayMode:              reuse,
+		runID: utils.GenerateRunID(), sessionID: restartExec.SessionID, actorID: restartExec.ActorID,
+		replaySourceRunID: sourceExec.RunID, replayBeforeExecutionID: sourceExec.ExecutionID, replayMode: opts.Reuse,
 	}
-	if reuse == "none" {
+	if opts.Reuse == "none" {
 		headers.replaySourceRunID = ""
 		headers.replayBeforeExecutionID = ""
 	}
-	if scope == "execution" && reuse == "succeeded-before" {
+	if opts.Scope == "execution" && opts.Reuse == "succeeded-before" {
 		headers.replayMode = "all-succeeded"
 		headers.replayBeforeExecutionID = ""
 	}
 
 	target := fmt.Sprintf("%s.%s", restartExec.NodeID, restartExec.ReasonerID)
-	plan, err := c.prepareExecutionForTarget(reqCtx, target, ExecuteRequest{
-		Input:   input,
-		Context: contextPayload,
-		Webhook: req.Webhook,
-	}, headers, "", "")
+	pool := getAsyncWorkerPool()
+	if admitted, stopped := pool.reserveForAdmission(); !admitted {
+		return nil, &restartQueueError{stopped: stopped}
+	}
+	reserved := true
+	defer func() {
+		if reserved {
+			pool.releaseReservation()
+		}
+	}()
+
+	plan, err := c.prepareExecutionForTargetWithAdmission(ctx, target, ExecuteRequest{
+		Input: input, Context: contextPayload, Webhook: opts.Webhook,
+	}, headers, "", "", true)
 	if err != nil {
-		writeExecutionError(ctx, err)
-		return
+		return nil, err
 	}
+	defer plan.releaseSlot()
 
-	if err := CheckExecutionPreconditions(plan.target.NodeID, plan.llmEndpoint); err != nil {
-		_ = c.failExecution(reqCtx, plan, err, 0, nil)
-		writeExecutionError(ctx, err)
-		return
+	kind := strings.TrimSpace(opts.Kind)
+	if kind == "" {
+		kind = "restart"
+		if opts.Fork || opts.Input != nil || opts.Context != nil {
+			kind = "fork"
+		}
 	}
-
-	kind := "restart"
-	if req.Fork || req.Input != nil || req.Context != nil {
-		kind = "fork"
-	}
-	c.persistRestartRunMetadata(reqCtx, plan, sourceExec, restartExec, scope, reuse, kind, req.Reason)
-
+	c.persistRestartRunMetadataWithOptions(ctx, plan, sourceExec, restartExec, opts, kind)
 	c.publishExecutionStartedEvent(plan)
 
-	pool := getAsyncWorkerPool()
-	job := asyncExecutionJob{
-		controller: c,
-		plan:       *plan,
-	}
-	if ok := pool.submit(job); !ok {
-		ReleaseExecutionSlot(plan.target.NodeID)
-		queueErr := errors.New("async execution queue is full; retry later")
-		if updateErr := c.failExecution(reqCtx, plan, queueErr, 0, nil); updateErr != nil {
-			logger.Logger.Error().Err(updateErr).Str("execution_id", plan.exec.ExecutionID).Msg("restart: failed to persist queue saturation")
+	job := asyncExecutionJob{controller: c, plan: *plan}
+	plan.slotHeld = false
+	submitted := false
+	defer func() {
+		if !submitted {
+			job.plan.releaseSlot()
 		}
-		ctx.JSON(http.StatusServiceUnavailable, gin.H{"error": queueErr.Error(), "error_category": "concurrency_limit"})
-		return
+	}()
+	if ok := pool.submitReserved(job); !ok {
+		shutdownErr := newControlPlaneShutdownError("async execution queue stopped; retry later")
+		job.terminateForControlPlaneShutdown(shutdownErr)
+		return nil, &restartQueueError{stopped: true}
 	}
+	submitted = true
+	reserved = false
+
+	c.persistRestartForwardPointers(ctx, sourceExec, restartExec, plan.exec)
 
 	createdAt := plan.exec.CreatedAt.UTC().Format(time.RFC3339)
 	var replayBefore *string
 	if headers.replayBeforeExecutionID != "" {
 		replayBefore = &headers.replayBeforeExecutionID
 	}
-	response := restartExecutionResponse{
-		ExecutionID:             plan.exec.ExecutionID,
-		RunID:                   plan.exec.RunID,
-		WorkflowID:              plan.exec.RunID,
-		Status:                  string(types.ExecutionStatusQueued),
-		Target:                  target,
-		Type:                    plan.targetType,
-		CreatedAt:               createdAt,
-		EnqueuedAt:              createdAt,
-		SourceExecutionID:       sourceExec.ExecutionID,
-		SourceRunID:             sourceExec.RunID,
-		RestartedExecutionID:    restartExec.ExecutionID,
-		ReplayBeforeExecutionID: replayBefore,
-		ReplayMode:              headers.replayMode,
-		Scope:                   scope,
-		Kind:                    kind,
-		WebhookRegistered:       plan.webhookRegistered,
-		WebhookError:            plan.webhookError,
-	}
-	ctx.Header("X-Execution-ID", plan.exec.ExecutionID)
-	ctx.Header("X-Run-ID", plan.exec.RunID)
-	ctx.JSON(http.StatusAccepted, response)
+	return &restartExecutionResponse{
+		ExecutionID: plan.exec.ExecutionID, RunID: plan.exec.RunID, WorkflowID: plan.exec.RunID,
+		Status: string(types.ExecutionStatusQueued), Target: target, Type: plan.targetType,
+		CreatedAt: createdAt, EnqueuedAt: createdAt,
+		SourceExecutionID: sourceExec.ExecutionID, SourceRunID: sourceExec.RunID,
+		RestartedExecutionID: restartExec.ExecutionID, ReplayBeforeExecutionID: replayBefore,
+		ReplayMode: headers.replayMode, Scope: opts.Scope, Kind: kind,
+		WebhookRegistered: plan.webhookRegistered, WebhookError: plan.webhookError,
+	}, nil
 }
 
 func (c *executionController) findWorkflowRestartRoot(ctx context.Context, runID string) (*types.Execution, error) {
@@ -240,6 +303,12 @@ func (c *executionController) findWorkflowRestartRoot(ctx context.Context, runID
 }
 
 func (c *executionController) persistRestartRunMetadata(ctx context.Context, plan *preparedExecution, sourceExec, restartExec *types.Execution, scope, reuse, kind, reason string) {
+	c.persistRestartRunMetadataWithOptions(ctx, plan, sourceExec, restartExec, restartOptions{
+		Scope: scope, Reuse: reuse, Reason: reason,
+	}, kind)
+}
+
+func (c *executionController) persistRestartRunMetadataWithOptions(ctx context.Context, plan *preparedExecution, sourceExec, restartExec *types.Execution, opts restartOptions, kind string) {
 	if plan == nil || plan.exec == nil || sourceExec == nil || restartExec == nil {
 		return
 	}
@@ -247,41 +316,83 @@ func (c *executionController) persistRestartRunMetadata(ctx context.Context, pla
 	if !ok {
 		return
 	}
-	now := time.Now().UTC()
-	metadata := map[string]interface{}{
-		"lineage": map[string]interface{}{
-			"kind":                   kind,
-			"source_run_id":          sourceExec.RunID,
-			"source_execution_id":    sourceExec.ExecutionID,
-			"restarted_execution_id": restartExec.ExecutionID,
-			"reuse":                  reuse,
-			"scope":                  scope,
-		},
+	lineage := map[string]interface{}{
+		"kind":                   kind,
+		"source_run_id":          sourceExec.RunID,
+		"source_execution_id":    sourceExec.ExecutionID,
+		"restarted_execution_id": restartExec.ExecutionID,
+		"reuse":                  opts.Reuse,
+		"scope":                  opts.Scope,
 	}
-	if trimmed := strings.TrimSpace(reason); trimmed != "" {
-		metadata["reason"] = trimmed
+	if kind == "resume" {
+		lineage["resume_attempt"] = opts.ResumeAttempt
 	}
-	encoded, err := json.Marshal(metadata)
+	var encodedReason json.RawMessage
+	if trimmed := strings.TrimSpace(opts.Reason); trimmed != "" {
+		encodedReason, _ = json.Marshal(trimmed)
+	}
+	encoded, err := json.Marshal(lineage)
 	if err != nil {
 		logger.Logger.Warn().Err(err).Str("run_id", plan.exec.RunID).Msg("failed to encode restart run metadata")
 		return
 	}
-	// This workflow_runs row exists only to carry lineage/golden metadata for the
-	// new run; it is the sole writer of this row for restart runs. Status and
-	// TotalSteps are seeded at enqueue time and are NOT kept current as the run
-	// progresses — every UI read path (run list, run detail, DAG) derives live
-	// status and step counts from execution aggregation and only reads the
-	// lineage/golden fields here. Do not treat these columns as authoritative.
-	if err := store.StoreWorkflowRun(ctx, &types.WorkflowRun{
-		RunID:           plan.exec.RunID,
-		RootWorkflowID:  plan.exec.RunID,
-		RootExecutionID: &plan.exec.ExecutionID,
-		Status:          string(types.ExecutionStatusQueued),
-		TotalSteps:      1,
-		Metadata:        json.RawMessage(encoded),
-		CreatedAt:       now,
-		UpdatedAt:       now,
+	if err := store.UpdateWorkflowRunMetadata(ctx, plan.exec.RunID, func(namespaces map[string]json.RawMessage) error {
+		namespaces["lineage"] = encoded
+		if encodedReason != nil {
+			namespaces["reason"] = encodedReason
+		} else {
+			delete(namespaces, "reason")
+		}
+		return nil
 	}); err != nil {
 		logger.Logger.Warn().Err(err).Str("run_id", plan.exec.RunID).Msg("failed to persist restart run metadata")
+	}
+}
+
+func (c *executionController) persistRestartForwardPointers(ctx context.Context, sourceExec, restartExec, successor *types.Execution) {
+	if sourceExec == nil || restartExec == nil || successor == nil {
+		return
+	}
+	if store, ok := c.store.(executionRestartPointerStore); ok {
+		sourceIDs := []string{sourceExec.ExecutionID}
+		if restartExec.ExecutionID != sourceExec.ExecutionID {
+			sourceIDs = append(sourceIDs, restartExec.ExecutionID)
+		}
+		for _, sourceID := range sourceIDs {
+			if sourceID == "" {
+				continue
+			}
+			if err := store.SetExecutionRestartedAs(ctx, sourceID, successor.ExecutionID); err != nil {
+				logger.Logger.Warn().Err(err).Str("execution_id", sourceID).Str("restarted_as", successor.ExecutionID).Msg("failed to persist restart forward pointer")
+			}
+		}
+	}
+
+	metadata, ok := c.store.(workflowRunMetadataStore)
+	if !ok {
+		return
+	}
+	at := time.Now().UTC().Format(time.RFC3339)
+	if err := metadata.UpdateWorkflowRunMetadata(ctx, sourceExec.RunID, func(namespaces map[string]json.RawMessage) error {
+		lineage := make(map[string]interface{})
+		if raw := namespaces["lineage"]; len(raw) > 0 {
+			_ = json.Unmarshal(raw, &lineage)
+		}
+		if lineage == nil {
+			lineage = make(map[string]interface{})
+		}
+		lineage["restarted_as"] = map[string]interface{}{
+			"execution_id": successor.ExecutionID,
+			"run_id":       successor.RunID,
+			"at":           at,
+		}
+		encoded, err := json.Marshal(lineage)
+		if err != nil {
+			return err
+		}
+		namespaces["lineage"] = encoded
+		return nil
+	}); err != nil {
+		logger.Logger.Warn().Err(err).Str("run_id", sourceExec.RunID).Str("restarted_as", successor.ExecutionID).Msg("failed to persist restart forward lineage")
 	}
 }

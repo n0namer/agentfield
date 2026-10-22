@@ -22,6 +22,7 @@ import (
 func (s *AgentFieldServer) registerPublicRoutes() {
 	s.Router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 	s.Router.GET("/health", s.healthCheckHandler)
+	s.Router.GET("/readyz", s.readinessHandler)
 }
 
 // registerCoreRoutes installs the core agent-facing REST surface under
@@ -29,6 +30,7 @@ func (s *AgentFieldServer) registerPublicRoutes() {
 func (s *AgentFieldServer) registerCoreRoutes(agentAPI *gin.RouterGroup) {
 	// Health check endpoint for container orchestration
 	agentAPI.GET("/health", s.healthCheckHandler)
+	agentAPI.GET("/health/ready", s.readinessHandler)
 	agentAPI.GET("/version", s.versionHandler)
 
 	// Apply global rate limiting if enabled
@@ -47,8 +49,13 @@ func (s *AgentFieldServer) registerCoreRoutes(agentAPI *gin.RouterGroup) {
 	agentAPI.GET("/reasoners", handlers.ListReasonersHandler(s.storage))
 
 	// Node management endpoints
-	agentAPI.POST("/nodes/register", handlers.RegisterNodeHandler(s.storage, s.uiService, s.didService, s.presenceManager, s.didWebService, s.tagApprovalService))
-	agentAPI.POST("/nodes", handlers.RegisterNodeHandler(s.storage, s.uiService, s.didService, s.presenceManager, s.didWebService, s.tagApprovalService))
+	resumeDependencies := handlers.InterruptedRunResumeDependencies{
+		Payloads: s.payloadStore, Webhooks: s.webhookDispatcher,
+		Timeout:       s.config.AgentField.ExecutionQueue.AgentCallTimeout,
+		InternalToken: s.config.Features.DID.Authorization.InternalToken,
+	}
+	agentAPI.POST("/nodes/register", handlers.RegisterNodeHandler(s.storage, s.uiService, s.didService, s.presenceManager, s.didWebService, s.tagApprovalService, resumeDependencies))
+	agentAPI.POST("/nodes", handlers.RegisterNodeHandler(s.storage, s.uiService, s.didService, s.presenceManager, s.didWebService, s.tagApprovalService, resumeDependencies))
 	agentAPI.POST("/nodes/register-serverless", handlers.RegisterServerlessAgentHandler(s.storage, s.uiService, s.didService, s.presenceManager, s.didWebService, s.config.AgentField.Registration.ServerlessDiscoveryAllowedHosts))
 	agentAPI.GET("/nodes", handlers.ListNodesHandler(s.storage))
 	agentAPI.GET("/nodes/:node_id", handlers.GetNodeHandler(s.storage))
@@ -132,9 +139,9 @@ func (s *AgentFieldServer) registerCoreRoutes(agentAPI *gin.RouterGroup) {
 	// pattern as POST /executions/batch-status); gin matches static first.
 	agentAPI.GET("/executions/active", handlers.ActiveExecutionsHandler(s.storage))
 	agentAPI.GET("/executions/:execution_id", handlers.GetExecutionStatusHandler(s.storage))
-	agentAPI.GET("/executions/:execution_id/events", handlers.StreamExecutionEventsHandler(s.storage))
+	agentAPI.GET("/executions/:execution_id/events", s.streamHandler(handlers.StreamExecutionEventsHandler(s.storage)))
 	agentAPI.POST("/executions/batch-status", handlers.BatchExecutionStatusHandler(s.storage))
-	agentAPI.POST("/executions/:execution_id/status", handlers.UpdateExecutionStatusHandler(s.storage, s.payloadStore, s.webhookDispatcher, s.config.AgentField.ExecutionQueue.AgentCallTimeout))
+	agentAPI.POST("/executions/:execution_id/status", handlers.UpdateExecutionStatusHandler(s.storage, s.payloadStore, s.webhookDispatcher, s.config.AgentField.ExecutionQueue.AgentCallTimeout, s.config.Features.DID.Authorization.InternalToken))
 	agentAPI.POST("/executions/:execution_id/logs", handlers.StructuredExecutionLogsHandler(s.storage, func() config.ExecutionLogsConfig {
 		return s.config.AgentField.ExecutionLogs
 	}))
@@ -142,6 +149,7 @@ func (s *AgentFieldServer) registerCoreRoutes(agentAPI *gin.RouterGroup) {
 	agentAPI.POST("/executions/:execution_id/pause", handlers.PauseExecutionHandler(s.storage))
 	agentAPI.POST("/executions/:execution_id/resume", handlers.ResumeExecutionHandler(s.storage))
 	agentAPI.POST("/executions/:execution_id/restart", handlers.RestartExecutionHandler(s.storage, s.payloadStore, s.webhookDispatcher, s.config.AgentField.ExecutionQueue.AgentCallTimeout, s.config.Features.DID.Authorization.InternalToken))
+	agentAPI.POST("/runs/:run_id/metadata", handlers.SetRunMetadataHandler(s.storage))
 	agentAPI.POST("/workflows/:workflowId/cancel-tree", handlers.CancelWorkflowTreeHandler(s.storage))
 
 	// Approval workflow endpoints — CP manages execution state only;
@@ -170,7 +178,7 @@ func (s *AgentFieldServer) registerCoreRoutes(agentAPI *gin.RouterGroup) {
 	// Execution notes endpoints for app.note() feature
 	agentAPI.POST("/executions/note", handlers.AddExecutionNoteHandler(s.storage, s.noteOwnershipEnforced()))
 	agentAPI.GET("/executions/:execution_id/notes", handlers.GetExecutionNotesHandler(s.storage, s.noteOwnershipEnforced()))
-	agentAPI.POST("/workflow/executions/events", handlers.WorkflowExecutionEventHandler(s.storage))
+	agentAPI.POST("/workflow/executions/events", handlers.WorkflowExecutionEventHandler(s.storage, resumeDependencies))
 
 	sessionTargetGroup := agentAPI.Group("/session-targets")
 	{
@@ -273,6 +281,23 @@ func (s *AgentFieldServer) healthCheckHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, healthStatus)
+}
+
+// readinessHandler answers Kubernetes readiness probes. It reports the same
+// dependency checks as healthCheckHandler, except that once BeginDrain has
+// run it answers 503 unconditionally so kube-proxy removes this pod from the
+// Service endpoints while the listener is still accepting and completing
+// requests.
+func (s *AgentFieldServer) readinessHandler(c *gin.Context) {
+	if s.IsDraining() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"status":    "draining",
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+			"version":   buildVersion,
+		})
+		return
+	}
+	s.healthCheckHandler(c)
 }
 
 type hostingInfo struct {

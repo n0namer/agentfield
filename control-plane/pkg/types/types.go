@@ -248,17 +248,19 @@ type SkillDefinition struct {
 
 // SessionDefinition defines a realtime session ingress provided by an agent node.
 type SessionDefinition struct {
-	Name         string                 `json:"name"`
-	Provider     string                 `json:"provider"`
-	Transport    string                 `json:"transport"`
-	Model        string                 `json:"model,omitempty"`
-	Modalities   []string               `json:"modalities,omitempty"`
-	Voice        string                 `json:"voice,omitempty"`
-	Tools        []string               `json:"tools,omitempty"`
-	Metadata     map[string]interface{} `json:"metadata,omitempty"`
-	Tags         []string               `json:"tags,omitempty"`
-	ProposedTags []string               `json:"proposed_tags,omitempty"`
-	ApprovedTags []string               `json:"approved_tags,omitempty"`
+	// Keep raw options until validation so unknown or malformed fields are rejected explicitly.
+	TurnDetection json.RawMessage        `json:"turn_detection,omitempty"`
+	Name          string                 `json:"name"`
+	Provider      string                 `json:"provider"`
+	Transport     string                 `json:"transport"`
+	Model         string                 `json:"model,omitempty"`
+	Modalities    []string               `json:"modalities,omitempty"`
+	Voice         string                 `json:"voice,omitempty"`
+	Tools         []string               `json:"tools,omitempty"`
+	Metadata      map[string]interface{} `json:"metadata,omitempty"`
+	Tags          []string               `json:"tags,omitempty"`
+	ProposedTags  []string               `json:"proposed_tags,omitempty"`
+	ApprovedTags  []string               `json:"approved_tags,omitempty"`
 }
 
 // HydrateAgentSessions copies session definitions from metadata.custom.sessions
@@ -566,14 +568,6 @@ func (as *AgentStatus) CompleteTransition() {
 	}
 }
 
-// min helper function
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // AgentFeatures holds feature flags for an agent node.
 type AgentFeatures struct {
 	ABTesting       bool            `json:"ab_testing"`
@@ -692,13 +686,15 @@ type WorkflowExecution struct {
 	ID int64 `json:"id" db:"id"`
 
 	// Core IDs
-	WorkflowID          string  `json:"workflow_id" db:"workflow_id"`
-	ExecutionID         string  `json:"execution_id" db:"execution_id"`
-	AgentFieldRequestID string  `json:"agentfield_request_id" db:"agentfield_request_id"`
-	RunID               *string `json:"run_id,omitempty" db:"run_id"`
-	SessionID           *string `json:"session_id,omitempty" db:"session_id"`
-	ActorID             *string `json:"actor_id,omitempty" db:"actor_id"`
-	AgentNodeID         string  `json:"agent_node_id" db:"agent_node_id"`
+	WorkflowID             string  `json:"workflow_id" db:"workflow_id"`
+	ExecutionID            string  `json:"execution_id" db:"execution_id"`
+	AgentFieldRequestID    string  `json:"agentfield_request_id" db:"agentfield_request_id"`
+	RunID                  *string `json:"run_id,omitempty" db:"run_id"`
+	SessionID              *string `json:"session_id,omitempty" db:"session_id"`
+	ActorID                *string `json:"actor_id,omitempty" db:"actor_id"`
+	AgentNodeID            string  `json:"agent_node_id" db:"agent_node_id"`
+	InstanceID             string  `json:"instance_id,omitempty" db:"instance_id"`
+	RestartedAsExecutionID *string `json:"-" db:"restarted_as_execution_id"`
 
 	// DAG Relationship Fields
 	ParentWorkflowID  *string `json:"parent_workflow_id,omitempty" db:"parent_workflow_id"`

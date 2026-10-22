@@ -1,11 +1,15 @@
 package config
 
 import (
+	"bytes"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/spf13/viper"
 )
 
 func TestEffectiveNodeLogProxy(t *testing.T) {
@@ -309,7 +313,9 @@ func TestApplyEnvOverrides(t *testing.T) {
 		"AGENTFIELD_APPROVAL_WEBHOOK_SECRET":                         "webhook-secret",
 		"AGENTFIELD_APPROVAL_DEFAULT_EXPIRY_HOURS":                   "30",
 		"AGENTFIELD_TRACING_ENABLED":                                 "1",
+		"AGENTFIELD_TRACING_EXPORTER":                                "otlp-grpc",
 		"OTEL_EXPORTER_OTLP_ENDPOINT":                                "http://otel.local:4318",
+		"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT":                         "http://traces.local:4318/v1/traces",
 		"OTEL_SERVICE_NAME":                                          "control-plane",
 		"AGENTFIELD_TRACING_INSECURE":                                "true",
 		"AGENTFIELD_CONNECTOR_ENABLED":                               "1",
@@ -400,7 +406,8 @@ func TestApplyEnvOverrides(t *testing.T) {
 		t.Fatalf("unexpected approval overrides: %+v", cfg.AgentField.Approval)
 	}
 	if !cfg.Features.Tracing.Enabled ||
-		cfg.Features.Tracing.Endpoint != "http://otel.local:4318" ||
+		cfg.Features.Tracing.Endpoint != "http://traces.local:4318/v1/traces" ||
+		cfg.Features.Tracing.Exporter != "otlp-grpc" ||
 		cfg.Features.Tracing.ServiceName != "control-plane" ||
 		!cfg.Features.Tracing.Insecure {
 		t.Fatalf("unexpected tracing overrides: %+v", cfg.Features.Tracing)
@@ -648,4 +655,230 @@ func TestAgentRestartGrace(t *testing.T) {
 			t.Fatalf("expected an unparseable value to be ignored, got %s", cfg.AgentField.NodeHealth.AgentRestartGrace)
 		}
 	})
+}
+
+func TestAgentDrainGraceFromEnvironment(t *testing.T) {
+	t.Setenv("AGENTFIELD_AGENT_DRAIN_GRACE", "75s")
+	cfg := Config{}
+	ApplyEnvOverrides(&cfg)
+	if cfg.AgentField.NodeHealth.AgentDrainGrace != 75*time.Second {
+		t.Fatalf("expected 75s drain grace, got %s", cfg.AgentField.NodeHealth.AgentDrainGrace)
+	}
+}
+
+func TestResumeInterruptedSettingsFromEnvironment(t *testing.T) {
+	t.Setenv("AGENTFIELD_RESUME_INTERRUPTED_RUNS", "true")
+	t.Setenv("AGENTFIELD_RESUME_INTERRUPTED_MAX_ATTEMPTS", "3")
+	t.Setenv("AGENTFIELD_RESUME_INTERRUPTED_WINDOW", "2h")
+	t.Setenv("AGENTFIELD_RESUME_INTERRUPTED_LIMIT", "17")
+	t.Setenv("AGENTFIELD_RESUME_INTERRUPTED_DELAY", "4s")
+	cfg := Config{}
+	ApplyEnvOverrides(&cfg)
+	nodeHealth := cfg.AgentField.NodeHealth
+	if !nodeHealth.EffectiveResumeInterruptedRuns() || nodeHealth.ResumeInterruptedMaxAttempts != 3 || nodeHealth.ResumeInterruptedWindow != 2*time.Hour || nodeHealth.ResumeInterruptedLimit != 17 || nodeHealth.ResumeInterruptedDelay != 4*time.Second {
+		t.Fatalf("unexpected interrupted-resume settings: %+v", nodeHealth)
+	}
+}
+
+func TestResumeInterruptedSettingsFromYAML(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "agentfield.yaml")
+	contents := []byte("agentfield:\n  node_health:\n    resume_interrupted_runs: true\n    resume_interrupted_max_attempts: 2\n    resume_interrupted_window: 90m\n    resume_interrupted_limit: 9\n    resume_interrupted_delay: 3s\n")
+	if err := os.WriteFile(path, contents, 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	nodeHealth := cfg.AgentField.NodeHealth
+	if !nodeHealth.EffectiveResumeInterruptedRuns() || nodeHealth.ResumeInterruptedMaxAttempts != 2 || nodeHealth.ResumeInterruptedWindow != 90*time.Minute || nodeHealth.ResumeInterruptedLimit != 9 || nodeHealth.ResumeInterruptedDelay != 3*time.Second {
+		t.Fatalf("unexpected interrupted-resume YAML settings: %+v", nodeHealth)
+	}
+}
+
+func TestResumeInterruptedEffectiveSettings(t *testing.T) {
+	defaults := NodeHealthConfig{}
+	if defaults.EffectiveResumeInterruptedRuns() {
+		t.Fatal("resume interrupted runs must be disabled by default")
+	}
+	if got := defaults.EffectiveResumeInterruptedMaxAttempts(); got != 1 {
+		t.Fatalf("expected one default resume attempt, got %d", got)
+	}
+	if got := defaults.EffectiveResumeInterruptedWindow(); got != time.Hour {
+		t.Fatalf("expected one-hour default resume window, got %s", got)
+	}
+	if got := defaults.EffectiveResumeInterruptedLimit(); got != 25 {
+		t.Fatalf("expected default resume limit 25, got %d", got)
+	}
+	if got := defaults.EffectiveResumeInterruptedDelay(); got != 15*time.Second {
+		t.Fatalf("expected 15-second default resume delay, got %s", got)
+	}
+
+	enabled := true
+	overrides := NodeHealthConfig{
+		ResumeInterruptedRuns:        &enabled,
+		ResumeInterruptedMaxAttempts: 3,
+		ResumeInterruptedWindow:      2 * time.Hour,
+		ResumeInterruptedLimit:       9,
+		ResumeInterruptedDelay:       4 * time.Second,
+	}
+	if !overrides.EffectiveResumeInterruptedRuns() ||
+		overrides.EffectiveResumeInterruptedMaxAttempts() != 3 ||
+		overrides.EffectiveResumeInterruptedWindow() != 2*time.Hour ||
+		overrides.EffectiveResumeInterruptedLimit() != 9 ||
+		overrides.EffectiveResumeInterruptedDelay() != 4*time.Second {
+		t.Fatalf("effective resume settings did not preserve overrides: %+v", overrides)
+	}
+
+	disabledDelay := NodeHealthConfig{ResumeInterruptedDelay: -time.Second}
+	if got := disabledDelay.EffectiveResumeInterruptedDelay(); got != 0 {
+		t.Fatalf("expected a negative resume delay to schedule immediately, got %s", got)
+	}
+}
+
+func TestOrphanReapEnabledParsing(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  bool
+		warn  bool
+	}{
+		{name: "unset", want: true},
+		{name: "true", value: "true", want: true},
+		{name: "false", value: "false", want: false},
+		{name: "one", value: "1", want: true},
+		{name: "zero", value: "0", want: false},
+		{name: "invalid", value: "maybe", want: true, warn: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("AGENTFIELD_AGENT_ORPHAN_REAP_ENABLED", tt.value)
+			var logs bytes.Buffer
+			previousWriter := log.Writer()
+			log.SetOutput(&logs)
+			t.Cleanup(func() { log.SetOutput(previousWriter) })
+			cfg := Config{}
+			ApplyDefaults(&cfg)
+			ApplyEnvOverrides(&cfg)
+			got := cfg.AgentField.NodeHealth.EffectiveAgentOrphanReapEnabled()
+			if got != tt.want {
+				t.Fatalf("expected %t for %q, got %t", tt.want, tt.value, got)
+			}
+			if got := strings.Contains(logs.String(), "invalid AGENTFIELD_AGENT_ORPHAN_REAP_ENABLED=\"maybe\""); got != tt.warn {
+				t.Fatalf("warning presence = %t, want %t; logs: %s", got, tt.warn, logs.String())
+			}
+		})
+	}
+}
+
+func TestOrphanReapEnabledYAMLFalseIsPreserved(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "agentfield.yaml")
+	contents := []byte("agentfield:\n  node_health:\n    agent_orphan_reap_enabled: false\n")
+	if err := os.WriteFile(path, contents, 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if cfg.AgentField.NodeHealth.EffectiveAgentOrphanReapEnabled() {
+		t.Fatal("expected explicit YAML false to be preserved")
+	}
+	if cfg.AgentField.NodeHealth.AgentOrphanReapEnabled == nil {
+		t.Fatal("expected explicit YAML false to retain presence")
+	}
+}
+
+// TestOrphanReapEnabledViperFalseIsPreserved covers the loader the shipped
+// binaries actually use. The pointer retains key presence through mapstructure
+// so ApplyDefaults can distinguish an explicit false from an omitted value.
+func TestOrphanReapEnabledViperFalseIsPreserved(t *testing.T) {
+	v := viper.New()
+	v.SetConfigType("yaml")
+	if err := v.ReadConfig(strings.NewReader("agentfield:\n  node_health:\n    agent_orphan_reap_enabled: false\n")); err != nil {
+		t.Fatalf("read viper config: %v", err)
+	}
+	var cfg Config
+	if err := v.Unmarshal(&cfg); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	ApplyDefaults(&cfg)
+	if cfg.AgentField.NodeHealth.EffectiveAgentOrphanReapEnabled() {
+		t.Fatal("expected explicit viper false to survive ApplyDefaults")
+	}
+	if cfg.AgentField.NodeHealth.AgentOrphanReapEnabled == nil {
+		t.Fatal("expected Viper to retain explicit false presence")
+	}
+}
+
+func TestNodeHealthYAMLRejectsNonMapping(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "agentfield.yaml")
+	if err := os.WriteFile(path, []byte("agentfield:\n  node_health: 5\n"), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	if _, err := LoadConfig(path); err == nil {
+		t.Fatal("expected a parse error for a scalar node_health block")
+	}
+}
+
+func TestShutdownTimeoutEnvAcceptsBareSecondsLikeTheSDKs(t *testing.T) {
+	t.Setenv("AGENTFIELD_SHUTDOWN_TIMEOUT", "20")
+	cfg := &Config{}
+	ApplyDefaults(cfg)
+	ApplyEnvOverrides(cfg)
+	if cfg.AgentField.ShutdownTimeout != 20*time.Second {
+		t.Fatalf("expected 20s from bare seconds, got %v", cfg.AgentField.ShutdownTimeout)
+	}
+	t.Setenv("AGENTFIELD_SHUTDOWN_TIMEOUT", "nonsense")
+	cfg = &Config{}
+	ApplyDefaults(cfg)
+	ApplyEnvOverrides(cfg)
+	if cfg.AgentField.ShutdownTimeout != 30*time.Second {
+		t.Fatalf("expected the 30s default to survive an invalid value, got %v", cfg.AgentField.ShutdownTimeout)
+	}
+}
+
+func TestShutdownMinDelayEnvParsing(t *testing.T) {
+	tests := []struct {
+		name       string
+		value      string
+		configured time.Duration
+		want       time.Duration
+	}{
+		{name: "bare seconds", value: "5", want: 5 * time.Second},
+		{name: "duration", value: "5s", want: 5 * time.Second},
+		{name: "subsecond duration", value: "500ms", want: 500 * time.Millisecond},
+		{name: "zero", value: "0", configured: time.Second, want: 0},
+		{name: "unset", value: "", configured: time.Second, want: time.Second},
+		{name: "unparseable", value: "abc", configured: time.Second, want: time.Second},
+		{name: "negative", value: "-1s", configured: time.Second, want: time.Second},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("AGENTFIELD_SHUTDOWN_MIN_DELAY", tt.value)
+			cfg := Config{AgentField: AgentFieldConfig{ShutdownMinDelay: tt.configured}}
+			ApplyEnvOverrides(&cfg)
+			if cfg.AgentField.ShutdownMinDelay != tt.want {
+				t.Fatalf("got %s, want %s", cfg.AgentField.ShutdownMinDelay, tt.want)
+			}
+		})
+	}
+}
+
+func TestShutdownTimeoutZeroStillKeepsCurrentValue(t *testing.T) {
+	t.Setenv("AGENTFIELD_SHUTDOWN_TIMEOUT", "0")
+	cfg := Config{AgentField: AgentFieldConfig{ShutdownTimeout: 15 * time.Second}}
+	ApplyEnvOverrides(&cfg)
+	if cfg.AgentField.ShutdownTimeout != 15*time.Second {
+		t.Fatalf("zero changed shutdown timeout to %s", cfg.AgentField.ShutdownTimeout)
+	}
+}
+
+func TestShutdownMinDelayDefaultsToZero(t *testing.T) {
+	t.Setenv("AGENTFIELD_SHUTDOWN_MIN_DELAY", "")
+	cfg := Config{}
+	ApplyDefaults(&cfg)
+	if cfg.AgentField.ShutdownMinDelay != 0 {
+		t.Fatalf("got %s, want zero", cfg.AgentField.ShutdownMinDelay)
+	}
 }

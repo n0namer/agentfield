@@ -241,6 +241,39 @@ async def test_run_without_schema_returns_plain_harness_result(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_run_without_schema_does_not_require_writable_project_dir(tmp_path):
+    """A schema-free run must reach the provider without allocating artifacts.
+
+    The per-run ``.agentfield-out-*`` directory only exists to hold the schema
+    output file (#684, #891). Allocating it unconditionally aborted a text-only
+    ``permission_mode="plan"`` run during setup, before the provider was ever
+    dispatched, whenever the project root could not be written to.
+    """
+    blocker = tmp_path / "blocker.txt"
+    blocker.write_text("not a directory", encoding="utf-8")
+    # Cannot be created on any platform: its parent is a regular file.
+    unwritable_root = blocker / "project"
+
+    provider = MockProvider([RawResult(result="plan text")])
+    runner = HarnessRunner()
+
+    with patch("agentfield.harness._runner.build_provider", return_value=provider):
+        result = await runner.run(
+            "hello",
+            provider="codex",
+            permission_mode="plan",
+            cwd=str(tmp_path),
+            project_dir=str(unwritable_root),
+        )
+
+    assert provider.call_count == 1, "schema-free run must dispatch the provider"
+    assert result.is_error is False
+    assert result.result == "plan text"
+    assert result.parsed is None
+    assert list(tmp_path.glob(".agentfield-out-*")) == []
+
+
+@pytest.mark.asyncio
 async def test_run_with_schema_injects_prompt_suffix_and_parses_output(tmp_path):
     provider = FileWritingProvider(json.dumps({"name": "ok", "count": 1}))
     runner = HarnessRunner()
@@ -403,6 +436,7 @@ async def test_run_resolves_harness_config_defaults_with_per_call_overrides(tmp_
     config = SimpleNamespace(
         provider="codex",
         model="default-model",
+        variant="low",
         max_turns=30,
         max_budget_usd=1.5,
         tools=["Read", "Write"],
@@ -422,6 +456,7 @@ async def test_run_resolves_harness_config_defaults_with_per_call_overrides(tmp_
         await runner.run(
             "hello",
             model="override-model",
+            variant="max",
             max_turns=5,
             env={"OVERRIDE": "1"},
             permission_mode="auto",
@@ -430,6 +465,7 @@ async def test_run_resolves_harness_config_defaults_with_per_call_overrides(tmp_
     assert provider.last_options is not None
     assert provider.last_options["provider"] == "codex"
     assert provider.last_options["model"] == "override-model"
+    assert provider.last_options["variant"] == "max"
     assert provider.last_options["max_turns"] == 5
     assert provider.last_options["max_budget_usd"] == 1.5
     assert provider.last_options["permission_mode"] == "auto"

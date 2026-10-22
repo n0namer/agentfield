@@ -1,7 +1,9 @@
 package storage
 
 import (
+	"encoding/json"
 	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -45,7 +47,6 @@ func TestQueryRunSummariesParsesTextTimestamps(t *testing.T) {
 	for _, exec := range executions {
 		require.NoError(t, ls.CreateExecutionRecord(ctx, exec))
 	}
-
 	results, _, err := ls.QueryRunSummaries(ctx, types.ExecutionFilter{})
 	require.NoError(t, err)
 	require.Len(t, results, 1)
@@ -60,6 +61,62 @@ func TestQueryRunSummariesParsesTextTimestamps(t *testing.T) {
 	// CreateExecutionRecord always overwrites updated_at with time.Now(),
 	// so LatestStarted will be approximately now, not the test's started_at.
 	require.True(t, summary.LatestStarted.After(base), "latest started should be after the test base time")
+}
+
+func TestExecutionRestartedAsPersistsAcrossBothLocalReadModels(t *testing.T) {
+	ls, ctx := setupLocalStorage(t)
+	now := time.Now().UTC()
+	require.NoError(t, ls.CreateExecutionRecord(ctx, &types.Execution{
+		ExecutionID: "source-forward-pointer", RunID: "source-run", AgentNodeID: "node",
+		NodeID: "node", ReasonerID: "reasoner", Status: types.ExecutionStatusFailed,
+		StartedAt: now, CreatedAt: now, UpdatedAt: now,
+	}))
+	runID := "source-run"
+	require.NoError(t, ls.StoreWorkflowExecution(ctx, &types.WorkflowExecution{
+		WorkflowID: "source-run", ExecutionID: "source-forward-pointer", AgentFieldRequestID: "request",
+		RunID: &runID, AgentNodeID: "node", ReasonerID: "reasoner", Status: string(types.ExecutionStatusFailed),
+		StartedAt: now, CreatedAt: now, UpdatedAt: now,
+	}))
+
+	require.NoError(t, ls.SetExecutionRestartedAs(ctx, "source-forward-pointer", "successor-forward-pointer"))
+	execution, err := ls.GetExecutionRecord(ctx, "source-forward-pointer")
+	require.NoError(t, err)
+	require.NotNil(t, execution.RestartedAsExecutionID)
+	require.Equal(t, "successor-forward-pointer", *execution.RestartedAsExecutionID)
+	workflow, err := ls.GetWorkflowExecution(ctx, "source-forward-pointer")
+	require.NoError(t, err)
+	require.NotNil(t, workflow.RestartedAsExecutionID)
+	require.Equal(t, "successor-forward-pointer", *workflow.RestartedAsExecutionID)
+}
+
+func TestQueryExecutionRecordsFiltersInterruptedRoots(t *testing.T) {
+	ls, ctx := setupLocalStorage(t)
+	now := time.Now().UTC()
+	orphan := "agent_restart_orphaned: old instance"
+	shutdown := "control_plane_shutdown"
+	other := "agent_error"
+	parent := "root-orphan"
+	restartedAs := "successor"
+	rows := []*types.Execution{
+		{ExecutionID: "root-orphan", RunID: "run-orphan", AgentNodeID: "node", NodeID: "node", ReasonerID: "reasoner", Status: types.ExecutionStatusFailed, StatusReason: &orphan, StartedAt: now},
+		{ExecutionID: "root-shutdown", RunID: "run-shutdown", AgentNodeID: "node", NodeID: "node", ReasonerID: "reasoner", Status: types.ExecutionStatusFailed, StatusReason: &shutdown, StartedAt: now},
+		{ExecutionID: "child-orphan", RunID: "run-orphan", ParentExecutionID: &parent, AgentNodeID: "node", NodeID: "node", ReasonerID: "reasoner", Status: types.ExecutionStatusFailed, StatusReason: &orphan, StartedAt: now},
+		{ExecutionID: "root-other", RunID: "run-other", AgentNodeID: "node", NodeID: "node", ReasonerID: "reasoner", Status: types.ExecutionStatusFailed, StatusReason: &other, StartedAt: now},
+		{ExecutionID: "root-already-restarted", RunID: "run-restarted", RestartedAsExecutionID: &restartedAs, AgentNodeID: "node", NodeID: "node", ReasonerID: "reasoner", Status: types.ExecutionStatusFailed, StatusReason: &orphan, StartedAt: now},
+	}
+	for _, row := range rows {
+		require.NoError(t, ls.CreateExecutionRecord(ctx, row))
+	}
+	cutoff := now.Add(-time.Minute)
+	got, err := ls.QueryExecutionRecords(ctx, types.ExecutionFilter{
+		UpdatedAfter: &cutoff, TerminalOnly: true, RootOnly: true, WithoutRestartedAs: true,
+		StatusReasons: []string{shutdown}, StatusReasonPrefixes: []string{"agent_restart_orphaned"},
+		SortBy: "updated_at", Limit: 25,
+	})
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	ids := []string{got[0].ExecutionID, got[1].ExecutionID}
+	require.ElementsMatch(t, []string{"root-orphan", "root-shutdown"}, ids)
 }
 
 func TestQueryRunSummariesSearchFilter(t *testing.T) {
@@ -107,6 +164,22 @@ func TestQueryRunSummariesSearchFilter(t *testing.T) {
 	for _, exec := range executions {
 		require.NoError(t, ls.CreateExecutionRecord(ctx, exec))
 	}
+	require.NoError(t, ls.UpdateWorkflowRunMetadata(ctx, "run-beta", func(namespaces map[string]json.RawMessage) error {
+		namespaces[types.RunMetadataNamespace] = json.RawMessage(`{
+			"display_name":"Outbound Release",
+			"labels":["priority-customer","fulfillment"],
+			"links":[{"label":"Do not search links","url":"https://metadata-link-only.test"}]
+		}`)
+		return nil
+	}))
+	require.NoError(t, ls.StoreWorkflowRun(ctx, &types.WorkflowRun{
+		RunID: "run-alpha", RootWorkflowID: "run-alpha", Status: "succeeded",
+		Metadata: json.RawMessage(`not-json`), CreatedAt: base, UpdatedAt: base,
+	}))
+	require.NoError(t, ls.StoreWorkflowRun(ctx, &types.WorkflowRun{
+		RunID: "run-gamma", RootWorkflowID: "run-gamma", Status: "succeeded",
+		Metadata: json.RawMessage(`{"run":{"labels":"legacy-wrong-shape"}}`), CreatedAt: base, UpdatedAt: base,
+	}))
 
 	// Sanity: no filter returns all three runs.
 	all, _, err := ls.QueryRunSummaries(ctx, types.ExecutionFilter{})
@@ -142,12 +215,48 @@ func TestQueryRunSummariesSearchFilter(t *testing.T) {
 	require.Equal(t, 2, total)
 	require.ElementsMatch(t, []string{"run-alpha", "run-gamma"}, runIDs(got))
 
+	// Match on the client-settable display name.
+	term = "Outbound Release"
+	got, total, err = ls.QueryRunSummaries(ctx, types.ExecutionFilter{Search: &term})
+	require.NoError(t, err)
+	require.Equal(t, 1, total)
+	require.ElementsMatch(t, []string{"run-beta"}, runIDs(got))
+
+	// Match on a client-settable label.
+	term = "priority-customer"
+	got, total, err = ls.QueryRunSummaries(ctx, types.ExecutionFilter{Search: &term})
+	require.NoError(t, err)
+	require.Equal(t, 1, total)
+	require.ElementsMatch(t, []string{"run-beta"}, runIDs(got))
+
+	// Links and provenance are intentionally not part of identity search.
+	term = "metadata-link-only"
+	got, total, err = ls.QueryRunSummaries(ctx, types.ExecutionFilter{Search: &term})
+	require.NoError(t, err)
+	require.Zero(t, total)
+	require.Empty(t, got)
+
 	// No match → empty result set, not an error.
 	term = "nonexistent-needle"
 	got, total, err = ls.QueryRunSummaries(ctx, types.ExecutionFilter{Search: &term})
 	require.NoError(t, err)
 	require.Equal(t, 0, total)
 	require.Empty(t, got)
+}
+
+func TestRunMetadataSearchPredicatesCoverSQLiteAndPostgres(t *testing.T) {
+	sqlitePredicate := runMetadataSearchPredicate("local")
+	require.Contains(t, sqlitePredicate, "json_valid")
+	require.Contains(t, sqlitePredicate, "json_each")
+	require.NotContains(t, sqlitePredicate, "jsonb_array_elements_text")
+	require.Equal(t, 2, strings.Count(sqlitePredicate, "?"))
+
+	postgresPredicate := runMetadataSearchPredicate("postgres")
+	require.Contains(t, postgresPredicate, "metadata->'run'->>'display_name'")
+	require.Contains(t, postgresPredicate, "jsonb_array_elements_text")
+	require.Contains(t, postgresPredicate, "jsonb_typeof")
+	require.NotContains(t, postgresPredicate, "json_each")
+	require.Equal(t, 2, strings.Count(postgresPredicate, "?"))
 }
 
 func TestQueryRunSummariesIncludesRootErrorFields(t *testing.T) {
@@ -160,17 +269,17 @@ func TestQueryRunSummariesIncludesRootErrorFields(t *testing.T) {
 	rootExecutionID := "exec-root"
 
 	root := &types.Execution{
-		ExecutionID: rootExecutionID,
-		RunID:       runID,
-		AgentNodeID: "test-slow",
-		ReasonerID:  "slow_task",
-		NodeID:      "node-root",
-		Status:      string(types.ExecutionStatusFailed),
+		ExecutionID:  rootExecutionID,
+		RunID:        runID,
+		AgentNodeID:  "test-slow",
+		ReasonerID:   "slow_task",
+		NodeID:       "node-root",
+		Status:       string(types.ExecutionStatusFailed),
 		StatusReason: &rootCategory,
 		ErrorMessage: &rootMessage,
-		StartedAt:   base,
-		CreatedAt:   base,
-		UpdatedAt:   base,
+		StartedAt:    base,
+		CreatedAt:    base,
+		UpdatedAt:    base,
 	}
 	child := &types.Execution{
 		ExecutionID:       "exec-child",

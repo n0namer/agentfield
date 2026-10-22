@@ -7,13 +7,29 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
 // Client provides AI/LLM capabilities using OpenAI or OpenRouter API.
 type Client struct {
-	config     *Config
-	httpClient *http.Client
+	config      *Config
+	httpClient  *http.Client
+	rateLimiter *RateLimiter
+}
+
+// RoutingProvider identifies the API route independently of the returned model vendor.
+func (c *Client) RoutingProvider() string {
+	endpoint, err := url.Parse(c.config.BaseURL)
+	if err == nil {
+		switch strings.ToLower(endpoint.Hostname()) {
+		case "openrouter.ai":
+			return "openrouter"
+		case "api.openai.com":
+			return "openai"
+		}
+	}
+	return "unknown"
 }
 
 // ClientOption configures an AI client during construction.
@@ -53,6 +69,10 @@ func NewClient(config *Config, opts ...ClientOption) (*Client, error) {
 		httpClient: &http.Client{
 			Timeout: config.Timeout,
 		},
+	}
+
+	if config.RateLimitEnabled() {
+		client.rateLimiter = NewRateLimiter(config.rateLimiterConfig())
 	}
 
 	for _, opt := range opts {
@@ -123,6 +143,24 @@ func (c *Client) doRequest(ctx context.Context, req *Request) (*Response, error)
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
+	if c.rateLimiter == nil {
+		return c.sendRequest(ctx, req, body)
+	}
+
+	var resp *Response
+	err = c.rateLimiter.Execute(ctx, func() error {
+		var callErr error
+		resp, callErr = c.sendRequest(ctx, req, body)
+		return callErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+// sendRequest performs a single (non-retried) chat completion HTTP request.
+func (c *Client) sendRequest(ctx context.Context, req *Request, body []byte) (*Response, error) {
 	// Build URL
 	url := strings.TrimSuffix(c.config.BaseURL, "/") + "/chat/completions"
 

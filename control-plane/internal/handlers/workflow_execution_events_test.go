@@ -90,6 +90,95 @@ func TestWorkflowExecutionEventHandler_CreateAndUpdate(t *testing.T) {
 	assert.Contains(t, string(exec.ResultPayload), "result")
 	require.NotNil(t, exec.DurationMS)
 	assert.Equal(t, duration, *exec.DurationMS)
+
+	wfExec, err := storage.GetWorkflowExecution(context.Background(), "exec_child")
+	require.NoError(t, err)
+	require.NotNil(t, wfExec)
+	assert.Equal(t, string(types.ExecutionStatusSucceeded), wfExec.Status)
+	assert.Contains(t, string(wfExec.OutputData), `"result":"ok"`)
+	require.NotNil(t, wfExec.CompletedAt)
+	require.NotNil(t, wfExec.DurationMS)
+	assert.Equal(t, duration, *wfExec.DurationMS)
+}
+
+func TestWorkflowExecutionEventHandler_PreservesGatewayInputEnvelope(t *testing.T) {
+	gatewayPayload := json.RawMessage(`{"input":{"message":"same"},"context":{"tenant":"acme"}}`)
+	current := &types.Execution{
+		ExecutionID:  "exec_gateway",
+		Status:       string(types.ExecutionStatusRunning),
+		InputPayload: append(json.RawMessage(nil), gatewayPayload...),
+	}
+
+	applyEventToExecution(current, &WorkflowExecutionEventRequest{
+		Status:    string(types.ExecutionStatusRunning),
+		InputData: map[string]interface{}{"message": "same"},
+	}, time.Now().UTC())
+
+	require.JSONEq(t, string(gatewayPayload), string(current.InputPayload))
+}
+
+func TestWorkflowExecutionEventHandler_ClassifiesGracefulShutdownCancellation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	storage := newTestExecutionStorage(nil)
+	handler := WorkflowExecutionEventHandler(storage)
+	now := time.Now().UTC()
+	runID := "run-existing-cancel"
+	require.NoError(t, storage.CreateExecutionRecord(t.Context(), &types.Execution{
+		ExecutionID: "existing-cancel", RunID: runID, Status: types.ExecutionStatusRunning,
+		StartedAt: now, CreatedAt: now, UpdatedAt: now,
+	}))
+	require.NoError(t, storage.StoreWorkflowExecution(t.Context(), &types.WorkflowExecution{
+		WorkflowID: runID, ExecutionID: "existing-cancel", RunID: &runID,
+		Status: types.ExecutionStatusRunning, StartedAt: now, CreatedAt: now, UpdatedAt: now,
+	}))
+
+	for _, test := range []struct {
+		name           string
+		executionID    string
+		errorMessage   string
+		expectedReason *string
+	}{
+		{
+			name:           "updates existing row",
+			executionID:    "existing-cancel",
+			errorMessage:   types.AgentShutdownCancellationError,
+			expectedReason: stringPointer(types.ExecutionReasonAgentShutdownCancelled),
+		},
+		{
+			name:           "creates row",
+			executionID:    "created-cancel",
+			errorMessage:   types.AgentShutdownCancellationError,
+			expectedReason: stringPointer(types.ExecutionReasonAgentShutdownCancelled),
+		},
+		{
+			name:         "does not classify another cancellation",
+			executionID:  "ordinary-cancel",
+			errorMessage: "cancelled by user",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			response := postWorkflowExecutionEvent(t, handler, WorkflowExecutionEventRequest{
+				ExecutionID: test.executionID,
+				RunID:       "run-" + test.executionID,
+				AgentNodeID: "node-1",
+				ReasonerID:  "reasoner-a",
+				Status:      types.ExecutionStatusCancelled,
+				Error:       test.errorMessage,
+			})
+			require.Equal(t, http.StatusOK, response.Code)
+
+			execution, err := storage.GetExecutionRecord(t.Context(), test.executionID)
+			require.NoError(t, err)
+			require.NotNil(t, execution)
+			require.Equal(t, test.expectedReason, execution.StatusReason)
+
+			workflow, err := storage.GetWorkflowExecution(t.Context(), test.executionID)
+			require.NoError(t, err)
+			require.NotNil(t, workflow)
+			require.Equal(t, test.expectedReason, workflow.StatusReason)
+		})
+	}
 }
 
 // TestWorkflowExecutionEventHandler_TerminalRegression covers the case where
@@ -154,4 +243,21 @@ func TestWorkflowExecutionEventHandler_TerminalRegression(t *testing.T) {
 	assert.Equal(t, string(types.ExecutionStatusFailed), exec.Status, "terminal status must not regress to running")
 	require.NotNil(t, exec.CompletedAt)
 	assert.True(t, exec.CompletedAt.Equal(originalCompletedAt), "CompletedAt must not be cleared by a regressing event")
+}
+
+func postWorkflowExecutionEvent(t *testing.T, handler gin.HandlerFunc, payload WorkflowExecutionEventRequest) *httptest.ResponseRecorder {
+	t.Helper()
+	body, err := json.Marshal(payload)
+	require.NoError(t, err)
+
+	response := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(response)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/workflow/executions/events", bytes.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	handler(ctx)
+	return response
+}
+
+func stringPointer(value string) *string {
+	return &value
 }

@@ -1,7 +1,8 @@
 import { EventEmitter } from 'node:events';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { extractFinalText, parseJsonl, runCli } from '../src/harness/cli.js';
+import { extractFinalText, markProviderCommand, parseJsonl, runCli } from '../src/harness/cli.js';
+import { HarnessProviderUnavailable } from '../src/harness/availability.js';
 
 type SpawnImpl = typeof import('node:child_process').spawn;
 
@@ -41,6 +42,12 @@ describe('harness cli utilities', () => {
     vi.restoreAllMocks();
   });
 
+  it('fails with a typed error before spawning a missing provider binary', async () => {
+    const command = markProviderCommand('codex', ['codex-definitely-missing-agentfield-test']);
+    await expect(runCli(command)).rejects.toBeInstanceOf(HarnessProviderUnavailable);
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
   it('runs a CLI command and captures stdout, stderr, exit code, cwd, and env', async () => {
     const proc = createProcess();
     spawnMock.mockReturnValueOnce(proc as unknown as ReturnType<SpawnImpl>);
@@ -66,6 +73,38 @@ describe('harness cli utilities', () => {
       stderr: 'warn',
       exitCode: 3
     });
+  });
+
+  it.each([
+    [undefined, undefined, '1'],
+    ['4', undefined, '5'],
+    ['4', '99', '99']
+  ])('sets harness depth from parent %s and caller %s', async (parent, caller, expected) => {
+    if (parent === undefined) delete process.env.AGENTFIELD_HARNESS_DEPTH;
+    else process.env.AGENTFIELD_HARNESS_DEPTH = parent;
+    const proc = createProcess();
+    spawnMock.mockReturnValueOnce(proc as unknown as ReturnType<SpawnImpl>);
+
+    const pending = runCli(['node'], caller === undefined
+      ? undefined
+      : { env: { AGENTFIELD_HARNESS_DEPTH: caller } });
+
+    expect(spawnMock).toHaveBeenCalledWith('node', [], expect.objectContaining({
+      env: expect.objectContaining({ AGENTFIELD_HARNESS_DEPTH: expected })
+    }));
+    proc.emit('close', 0);
+    await pending;
+    delete process.env.AGENTFIELD_HARNESS_DEPTH;
+  });
+
+  it('reports a signal death as a negative exit code', async () => {
+    const proc = createProcess();
+    spawnMock.mockReturnValueOnce(proc as unknown as ReturnType<SpawnImpl>);
+
+    const pending = runCli(['killed']);
+    proc.emit('close', null, 'SIGKILL');
+
+    await expect(pending).resolves.toMatchObject({ exitCode: -9 });
   });
 
   it('adds OpenRouter attribution env defaults and preserves caller overrides', async () => {

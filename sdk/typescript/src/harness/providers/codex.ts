@@ -1,7 +1,9 @@
 import type { HarnessProvider } from './base.js';
+import { resolveRoot } from './base.js';
 import type { RawResult } from '../types.js';
 import { createRawResult, createMetrics } from '../types.js';
-import { runCli, parseJsonl, extractFinalText } from '../cli.js';
+import { markProviderCommand, runCli, parseJsonl, extractFinalText } from '../cli.js';
+import { HarnessProviderUnavailable, providerUnavailable } from '../availability.js';
 import { resolveModelAndVariant } from '../modelVariant.js';
 
 export class CodexProvider implements HarnessProvider {
@@ -13,9 +15,10 @@ export class CodexProvider implements HarnessProvider {
 
   async execute(prompt: string, options: Record<string, unknown>): Promise<RawResult> {
     const cmd = [this.bin, 'exec', '--json'];
+    const root = resolveRoot(options);
 
-    if (options.cwd) {
-      cmd.push('-C', String(options.cwd));
+    if (root) {
+      cmd.push('-C', root);
     }
     if (options.permissionMode === 'auto') {
       cmd.push('--full-auto');
@@ -37,9 +40,9 @@ export class CodexProvider implements HarnessProvider {
 
     const startApi = Date.now();
     try {
-      const { stdout, stderr, exitCode } = await runCli(cmd, {
+      const { stdout, stderr, exitCode } = await runCli(markProviderCommand('codex', cmd), {
         env: options.env as Record<string, string> | undefined,
-        cwd: options.cwd as string | undefined,
+        cwd: root,
       });
 
       const events = parseJsonl(stdout);
@@ -69,13 +72,12 @@ export class CodexProvider implements HarnessProvider {
         errorMessage: isError ? stderr.trim() : undefined,
       });
     } catch (err) {
+      if (err instanceof HarnessProviderUnavailable) {
+        throw err;
+      }
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes('ENOENT')) {
-        return createRawResult({
-          isError: true,
-          errorMessage: `Codex binary not found at '${this.bin}'. Install: https://github.com/openai/codex`,
-          metrics: createMetrics({ durationApiMs: Date.now() - startApi }),
-        });
+        throw providerUnavailable('codex', this.bin);
       }
       return createRawResult({
         isError: true,

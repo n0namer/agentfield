@@ -1,7 +1,9 @@
 import type { HarnessProvider } from './base.js';
+import { resolveRoot } from './base.js';
 import type { RawResult } from '../types.js';
 import { createMetrics, createRawResult } from '../types.js';
 import { resolveModelAndVariant } from '../modelVariant.js';
+import { HarnessProviderUnavailable } from '../availability.js';
 
 type QueryInput = {
   prompt: string;
@@ -33,10 +35,10 @@ export class ClaudeCodeProvider implements HarnessProvider {
       const mod = await import('@anthropic-ai/claude-agent-sdk');
       sdk = mod as ClaudeSdkModule;
     } catch {
-      throw new Error(
-        "@anthropic-ai/claude-agent-sdk is required for the 'claude-code' provider. " +
-          'Install it with: npm install @anthropic-ai/claude-agent-sdk'
-      );
+      throw new HarnessProviderUnavailable('claude-code', {
+        binary: '@anthropic-ai/claude-agent-sdk',
+        installCommand: 'npm install @anthropic-ai/claude-agent-sdk',
+      });
     }
 
     const agentOptions: Record<string, unknown> = {};
@@ -44,7 +46,8 @@ export class ClaudeCodeProvider implements HarnessProvider {
     // suffix so the SDK receives a valid model id, and drop the variant.
     const { model: modelValue } = resolveModelAndVariant(options);
     if (modelValue !== undefined) agentOptions.model = modelValue;
-    if (options.cwd !== undefined) agentOptions.cwd = options.cwd;
+    const root = resolveRoot(options);
+    if (root !== undefined) agentOptions.cwd = root;
     if (options.maxTurns !== undefined) agentOptions.maxTurns = options.maxTurns;
     if (options.tools !== undefined) agentOptions.allowedTools = options.tools;
     if (options.systemPrompt !== undefined) agentOptions.systemPrompt = options.systemPrompt;

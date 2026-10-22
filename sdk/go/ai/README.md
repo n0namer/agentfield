@@ -9,6 +9,7 @@ This package provides AI/LLM capabilities for the AgentField Go SDK, supporting 
 - ✅ **Streaming**: Support for streaming responses
 - ✅ **Type-Safe**: Automatic conversion from Go structs to JSON schemas
 - ✅ **Functional Options**: Clean, idiomatic Go API with functional options pattern
+- ✅ **Rate Limiting**: Automatic exponential backoff with jitter and a circuit breaker
 - ✅ **Automatic Configuration**: Reads from environment variables by default
 
 ## Quick Start
@@ -143,6 +144,93 @@ Model: "infron/moonshotai/kimi-k2.6"  // sent as moonshotai/kimi-k2.6
 Note that Infron reports native cost at the top level of the body (and of the
 final stream chunk) rather than nested under `usage.cost`. The SDK normalizes
 both shapes into `Usage.Cost`, so cost tracking reads the same either way.
+
+### IO Intelligence (io.net) Configuration
+
+IO Intelligence is an OpenAI-compatible Chat Completions endpoint that serves
+Hugging Face-style `org/name` model ids, so wiring it up is a base URL and a
+model id:
+
+```go
+aiConfig := &ai.Config{
+    APIKey:      os.Getenv("IONET_API_KEY"),
+    BaseURL:     "https://api.intelligence.io.solutions/api/v1",
+    Model:       "meta-llama/Llama-3.3-70B-Instruct", // id as returned by GET /models
+    Temperature: 0.7,
+    MaxTokens:   4096,
+}
+```
+
+`ai.DefaultConfig()` picks this up from `IONET_API_KEY` automatically. A key
+from a provider already configured in the environment keeps precedence. With
+no `AI_MODEL` set, the default falls back to
+`meta-llama/Llama-3.3-70B-Instruct` — io.net serves no `gpt-4o` — so an
+io.net-only environment works out of the box. io.net rotates its catalog, so
+if that id is ever retired, set `AI_MODEL` to any current id from
+`GET /models` on the base URL. If you route io.net through a
+custom `AI_BASE_URL` the SDK cannot recognize as io.net (a proxy), set
+`AI_MODEL` yourself.
+
+An `ionet/` model prefix is accepted as a routing marker for callers that
+select the gateway by model string, and is stripped before the request goes
+out (the endpoint serves the bare id). The marker rewrites the model string
+only — it never reroutes a request on its own, so with a higher-precedence
+provider key set the request still goes to that provider's endpoint:
+
+```go
+Model: "ionet/meta-llama/Llama-3.3-70B-Instruct"  // sent as meta-llama/Llama-3.3-70B-Instruct
+```
+
+### Rate Limiting & Circuit Breaker
+
+The client can automatically retry rate-limited AI calls (HTTP 429/503, or
+provider errors whose message contains a rate-limit keyword) using exponential
+backoff with jitter, and stop issuing requests once a provider is clearly down.
+
+Rate limiting is opt-in: it is enabled only when `RateLimitMaxRetries > 0`.
+
+```go
+aiConfig := &ai.Config{
+    APIKey: os.Getenv("OPENAI_API_KEY"),
+    Model:  "gpt-4o",
+
+    // Rate limiting
+    RateLimitMaxRetries:   5,               // retries after the initial call
+    RateLimitBaseDelay:    time.Second,     // starting delay, doubled per attempt
+    RateLimitMaxDelay:     30 * time.Second, // delay ceiling
+    RateLimitJitterFactor: 0.25,            // +/-25% random variation
+
+    // Circuit breaker
+    CircuitBreakerThreshold: 5,                // open after 5 consecutive failures
+    CircuitBreakerTimeout:   60 * time.Second, // probe recovery after 60s
+}
+
+resp, err := agent.AI(ctx, "Hello, world!")
+if err != nil {
+    switch {
+    case errors.Is(err, ai.ErrCircuitOpen):
+        // Too many consecutive failures; back off and try again later.
+    case errors.Is(err, ai.ErrMaxRetriesExceeded):
+        // All retries were exhausted. The last provider error is wrapped.
+    }
+}
+```
+
+**Behavior**
+
+1. **Exponential backoff**: attempt `n` waits `BaseDelay * 2^n`, capped at
+   `MaxDelay`. A server-provided retry hint is honored when present and within
+   `MaxDelay`.
+2. **Jitter**: each delay is varied by `+/- JitterFactor`, seeded per process so
+   many instances spread their retries without coordination.
+3. **Circuit breaker**: opens after `CircuitBreakerThreshold` consecutive
+   rate-limit failures. While open, calls fail fast with `ai.ErrCircuitOpen`.
+   After `CircuitBreakerTimeout` the circuit becomes half-open and allows one
+   probe; a success closes it. Set `CircuitBreakerThreshold` to a negative value
+   to disable the breaker while keeping retries.
+
+Any zero-value field falls back to a sensible default (5 retries, 500ms base,
+30s max, 0.25 jitter, threshold 5, 30s timeout).
 
 ## API Reference
 

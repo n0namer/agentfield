@@ -1,4 +1,5 @@
 from .agent import Agent
+from .mesh import AgentMesh
 from .cost_tracker import CostTracker
 from .router import AgentRouter
 from .types import (
@@ -63,6 +64,7 @@ from .crypto import (
 from .exceptions import (
     AgentFieldError,
     AgentFieldClientError,
+    MeshTargetNotFound,
     ExecutionTimeoutError,
     MemoryAccessError,
     ReasonerFailed,
@@ -89,8 +91,14 @@ from .tool_calling import (
     capabilities_to_tool_schemas,
 )
 
+from .session_turn_detection import ServerVAD, SemanticVAD, TurnDetection
+
 __all__ = [
+    "ServerVAD",
+    "SemanticVAD",
+    "TurnDetection",
     "Agent",
+    "AgentMesh",
     "CostTracker",
     "AIConfig",
     "HarnessConfig",
@@ -161,6 +169,7 @@ __all__ = [
     # Exceptions
     "AgentFieldError",
     "AgentFieldClientError",
+    "MeshTargetNotFound",
     "ExecutionTimeoutError",
     "MemoryAccessError",
     "ReasonerFailed",
@@ -183,4 +192,4 @@ __all__ = [
     "reasoner",
 ]
 
-__version__ = "0.1.135"
+__version__ = "0.1.142-rc.14"

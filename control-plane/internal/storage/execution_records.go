@@ -12,6 +12,42 @@ import (
 	"github.com/Agent-Field/agentfield/control-plane/pkg/types"
 )
 
+// staleTimestampExpr returns the SQL expression used to compare an execution's
+// most recent activity timestamp against the stale cutoff.
+//
+// SQLite stores timestamps as text and compares them lexically. When a host
+// runs in a non-UTC timezone, time.Now() persists values carrying a local zone
+// offset (e.g. "...-05:00"), and a fresh local value can sort BEFORE a UTC
+// cutoff even though its instant is newer, wrongly reaping active executions
+// (#1040). Wrapping the value in julianday() forces an instant-aware numeric
+// comparison that is offset-correct.
+//
+// Postgres columns are timestamptz and already compare by instant, and
+// julianday() does not exist there, so Postgres keeps the plain expression.
+func (ls *LocalStorage) staleTimestampExpr(col string) string {
+	if ls.requireSQLDB().Mode() == "postgres" {
+		return col
+	}
+	return "julianday(" + col + ")"
+}
+
+// childTerminalRecencyExpr returns an expression for "the later of a child's
+// control-plane record time (updated_at) and its agent-reported completion
+// time (completed_at)". completed_at is stored verbatim from the agent, so on a
+// skewed agent clock or a callback that took a while to land it can already be
+// older than the cutoff at the moment the control plane writes the terminal row
+// (issue #1059 review). updated_at is the control plane's own write clock, so
+// taking the maximum shields the parent whenever EITHER clock says the child
+// finished after the cutoff. On the executions table a terminal row's
+// updated_at is frozen (terminal->terminal is rejected), so this cannot shield
+// indefinitely.
+func (ls *LocalStorage) childTerminalRecencyExpr() string {
+	if ls.requireSQLDB().Mode() == "postgres" {
+		return "GREATEST(COALESCE(c.completed_at, c.updated_at), COALESCE(c.updated_at, c.completed_at))"
+	}
+	return "MAX(julianday(COALESCE(c.completed_at, c.updated_at)), julianday(COALESCE(c.updated_at, c.completed_at)))"
+}
+
 // maxNodesForDepthCalc caps the number of executions for which we compute DAG depth to avoid heavy queries.
 const maxNodesForDepthCalc = 1000
 
@@ -33,14 +69,14 @@ func (ls *LocalStorage) CreateExecutionRecord(ctx context.Context, exec *types.E
 	insert := `
 		INSERT INTO executions (
 			execution_id, run_id, parent_execution_id,
-			agent_node_id, reasoner_id, node_id,
+			agent_node_id, instance_id, restarted_as_execution_id, reasoner_id, node_id,
 			status, status_reason, input_payload, result_payload, error_message,
 			input_uri, result_uri,
 			session_id, actor_id,
 			started_at, completed_at, duration_ms,
 			notes,
 			created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	// Serialize notes to JSON
 	var notesJSON []byte
@@ -59,6 +95,8 @@ func (ls *LocalStorage) CreateExecutionRecord(ctx context.Context, exec *types.E
 		exec.RunID,
 		exec.ParentExecutionID,
 		exec.AgentNodeID,
+		exec.InstanceID,
+		exec.RestartedAsExecutionID,
 		exec.ReasonerID,
 		exec.NodeID,
 		exec.Status,
@@ -88,7 +126,7 @@ func (ls *LocalStorage) CreateExecutionRecord(ctx context.Context, exec *types.E
 func (ls *LocalStorage) GetExecutionRecord(ctx context.Context, executionID string) (*types.Execution, error) {
 	query := `
 		SELECT execution_id, run_id, parent_execution_id,
-		       agent_node_id, reasoner_id, node_id,
+		       agent_node_id, COALESCE(instance_id, ''), restarted_as_execution_id, reasoner_id, node_id,
 		       status, status_reason, input_payload, result_payload, error_message,
 		       input_uri, result_uri,
 		       session_id, actor_id,
@@ -130,7 +168,7 @@ func (ls *LocalStorage) GetExecutionRecordsBatch(ctx context.Context, executionI
 	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(executionIDs)), ",")
 	query := fmt.Sprintf(`
 		SELECT execution_id, run_id, parent_execution_id,
-		       agent_node_id, reasoner_id, node_id,
+		       agent_node_id, COALESCE(instance_id, ''), restarted_as_execution_id, reasoner_id, node_id,
 		       status, status_reason, input_payload, result_payload, error_message,
 		       input_uri, result_uri,
 		       session_id, actor_id,
@@ -192,7 +230,7 @@ func (ls *LocalStorage) UpdateExecutionRecord(ctx context.Context, executionID s
 	// commits, then re-reads the committed row instead of a stale snapshot.
 	row := tx.QueryRowContext(ctx, `
 		SELECT execution_id, run_id, parent_execution_id,
-		       agent_node_id, reasoner_id, node_id,
+		       agent_node_id, COALESCE(instance_id, ''), restarted_as_execution_id, reasoner_id, node_id,
 		       status, status_reason, input_payload, result_payload, error_message,
 		       input_uri, result_uri,
 		       session_id, actor_id,
@@ -234,6 +272,8 @@ func (ls *LocalStorage) UpdateExecutionRecord(ctx context.Context, executionID s
 			run_id = ?,
 			parent_execution_id = ?,
 			agent_node_id = ?,
+			instance_id = ?,
+			restarted_as_execution_id = ?,
 			reasoner_id = ?,
 			node_id = ?,
 			status = ?,
@@ -258,6 +298,8 @@ func (ls *LocalStorage) UpdateExecutionRecord(ctx context.Context, executionID s
 		updated.RunID,
 		updated.ParentExecutionID,
 		updated.AgentNodeID,
+		updated.InstanceID,
+		updated.RestartedAsExecutionID,
 		updated.ReasonerID,
 		updated.NodeID,
 		updated.Status,
@@ -335,6 +377,35 @@ func (ls *LocalStorage) QueryExecutionRecords(ctx context.Context, filter types.
 		where = append(where, "started_at <= ?")
 		args = append(args, filter.EndTime.UTC())
 	}
+	if filter.UpdatedAfter != nil {
+		where = append(where, "updated_at >= ?")
+		args = append(args, filter.UpdatedAfter.UTC())
+	}
+	if filter.UpdatedBefore != nil {
+		where = append(where, "updated_at <= ?")
+		args = append(args, filter.UpdatedBefore.UTC())
+	}
+	if filter.TerminalOnly {
+		where = append(where, "status IN ('succeeded', 'failed', 'cancelled', 'timeout')")
+	}
+	if filter.RootOnly {
+		where = append(where, "COALESCE(parent_execution_id, '') = ''")
+	}
+	if filter.WithoutRestartedAs {
+		where = append(where, "COALESCE(restarted_as_execution_id, '') = ''")
+	}
+	if len(filter.StatusReasons) > 0 || len(filter.StatusReasonPrefixes) > 0 {
+		var reasonPredicates []string
+		for _, reason := range filter.StatusReasons {
+			reasonPredicates = append(reasonPredicates, "status_reason = ?")
+			args = append(args, reason)
+		}
+		for _, prefix := range filter.StatusReasonPrefixes {
+			reasonPredicates = append(reasonPredicates, "substr(status_reason, 1, ?) = ?")
+			args = append(args, len(prefix), prefix)
+		}
+		where = append(where, "("+strings.Join(reasonPredicates, " OR ")+")")
+	}
 
 	queryBuilder := strings.Builder{}
 	// Omit large TOAST columns when the caller signals payloads are not needed.
@@ -345,7 +416,7 @@ func (ls *LocalStorage) QueryExecutionRecords(ctx context.Context, filter types.
 	}
 	queryBuilder.WriteString(`
 		SELECT execution_id, run_id, parent_execution_id,
-		       agent_node_id, reasoner_id, node_id,
+		       agent_node_id, COALESCE(instance_id, ''), restarted_as_execution_id, reasoner_id, node_id,
 		       status, status_reason, ` + payloadCols + `, error_message,
 		       input_uri, result_uri,
 		       session_id, actor_id,
@@ -472,8 +543,8 @@ func (ls *LocalStorage) QueryRunSummaries(ctx context.Context, filter types.Exec
 	}
 	if filter.Search != nil {
 		searchTerm := "%" + *filter.Search + "%"
-		where = append(where, "(run_id LIKE ? OR agent_node_id LIKE ? OR reasoner_id LIKE ?)")
-		args = append(args, searchTerm, searchTerm, searchTerm)
+		where = append(where, "(run_id LIKE ? OR agent_node_id LIKE ? OR reasoner_id LIKE ? OR "+runMetadataSearchPredicate(ls.mode)+")")
+		args = append(args, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm)
 	}
 
 	whereClause := ""
@@ -773,6 +844,54 @@ func (ls *LocalStorage) QueryRunSummaries(ctx context.Context, filter types.Exec
 	}
 
 	return summaries, totalRuns, nil
+}
+
+// runMetadataSearchPredicate adds only the client-facing run display name and
+// labels to run search. The workflow_runs metadata column is JSONB in
+// PostgreSQL and JSON text in SQLite, so each backend needs its own JSON table
+// function. Both variants guard legacy/malformed namespace shapes rather than
+// letting one bad metadata row fail the whole runs list.
+func runMetadataSearchPredicate(mode string) string {
+	if mode == "postgres" {
+		return `run_id IN (
+			SELECT wr.run_id
+			FROM workflow_runs wr
+			WHERE wr.metadata->'run'->>'display_name' LIKE ?
+			   OR EXISTS (
+				SELECT 1
+				FROM jsonb_array_elements_text(
+					CASE
+						WHEN jsonb_typeof(wr.metadata->'run'->'labels') = 'array'
+						THEN wr.metadata->'run'->'labels'
+						ELSE '[]'::jsonb
+					END
+				) AS run_label(value)
+				WHERE run_label.value LIKE ?
+			)
+		)`
+	}
+	return `run_id IN (
+		SELECT wr.run_id
+		FROM workflow_runs wr
+		WHERE CASE
+				WHEN json_valid(wr.metadata) THEN json_extract(wr.metadata, '$.run.display_name')
+			END LIKE ?
+		   OR EXISTS (
+			SELECT 1
+			FROM json_each(
+				CASE
+					WHEN json_valid(wr.metadata) THEN
+						CASE
+							WHEN json_type(wr.metadata, '$.run.labels') = 'array'
+							THEN json_extract(wr.metadata, '$.run.labels')
+							ELSE '[]'
+						END
+					ELSE '[]'
+				END
+			) AS run_label
+			WHERE CAST(run_label.value AS TEXT) LIKE ?
+		)
+	)`
 }
 
 // mapRunSummarySortColumn restricts ORDER BY to vetted columns to avoid SQL injection and
@@ -1110,12 +1229,24 @@ func parseTimeString(value string) (time.Time, error) {
 // non-terminal child are skipped. A parent's own updated_at stops moving while
 // it waits, so without this a long child call — one agent doing many minutes of
 // work in a single request — reaps its whole ancestor chain even though real
-// work is happening. Deliberately no recency test on the child: the chain
-// unwinds bottom-up instead. If work genuinely stops, the leaf goes stale and
-// is reaped first, which makes its parent childless and eligible on the next
-// sweep, and so on up. Nothing is stuck forever; it just takes one sweep per
-// level.
+// work is happening.
+//
+// A child that reached a terminal state after the cutoff also shields its parent
+// for one stale window, covering the brief gap between a child reporting success
+// and the parent posting its own result (issue #1059). timeout children are
+// excluded from this so the reaper's own kills cannot perpetuate a shield.
+// Consequence: a non-timeout child that just finished delays its parent's reap
+// by up to one stale window, so the bottom-up chain unwind can take a stale
+// window per level rather than a single sweep. Nothing is stuck forever — a
+// child that finished before the cutoff no longer shields, so the chain always
+// drains.
+// The conditional UPDATE re-evaluates the staleness predicates so a row that
+// gains activity after selection is left alone.
 func (ls *LocalStorage) MarkStaleExecutions(ctx context.Context, staleAfter time.Duration, limit int) (int, error) {
+	return ls.markStaleExecutions(ctx, staleAfter, limit, nil)
+}
+
+func (ls *LocalStorage) markStaleExecutions(ctx context.Context, staleAfter time.Duration, limit int, afterCandidateSelection func()) (int, error) {
 	if limit <= 0 {
 		return 0, nil
 	}
@@ -1126,18 +1257,32 @@ func (ls *LocalStorage) MarkStaleExecutions(ctx context.Context, staleAfter time
 	cutoff := time.Now().UTC().Add(-staleAfter)
 
 	db := ls.requireSQLDB()
+	tsExpr := ls.staleTimestampExpr("COALESCE(updated_at, created_at, started_at)")
+	executionUpdateTSExpr := ls.staleTimestampExpr("COALESCE(e.updated_at, e.created_at, e.started_at)")
+	cutoffExpr := ls.staleTimestampExpr("?")
+	// A child that reached a terminal state after the cutoff also shields its
+	// parent. When a child finishes, the parent needs a brief window (~50-600ms)
+	// to receive the result and post its own status; the parent's own updated_at
+	// does not move while it waits. Without this the reaper can time the parent
+	// out in that window, and the parent's real success callback then gets a 409.
+	// A child that finished long before the cutoff no longer shields the parent,
+	// so a genuinely stuck parent is still reaped (see issue #1059).
+	childRecencyTSExpr := ls.childTerminalRecencyExpr()
 	rows, err := db.QueryContext(ctx, `
 		SELECT execution_id, started_at
 		FROM executions e
 		WHERE status IN ('running', 'pending', 'queued')
-		  AND COALESCE(updated_at, created_at, started_at) <= ?
+		  AND `+tsExpr+` <= `+cutoffExpr+`
 		  AND NOT EXISTS (
 		      SELECT 1 FROM executions c
 		      WHERE c.parent_execution_id = e.execution_id
-		        AND c.status IN ('running', 'pending', 'queued')
+		        AND (
+		            c.status IN ('running', 'pending', 'queued')
+		            OR (c.status != 'timeout' AND `+childRecencyTSExpr+` > `+cutoffExpr+`)
+		        )
 		  )
-		ORDER BY COALESCE(updated_at, created_at, started_at) ASC
-		LIMIT ?`, cutoff, limit)
+		ORDER BY `+tsExpr+` ASC
+		LIMIT ?`, cutoff, cutoff, limit)
 	if err != nil {
 		return 0, fmt.Errorf("query stale executions: %w", err)
 	}
@@ -1164,6 +1309,12 @@ func (ls *LocalStorage) MarkStaleExecutions(ctx context.Context, staleAfter time
 		return 0, nil
 	}
 
+	// Package tests use this seam to make the candidate-selection-to-update
+	// interleaving deterministic; production callers leave it nil.
+	if afterCandidateSelection != nil {
+		afterCandidateSelection()
+	}
+
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, fmt.Errorf("begin stale execution transaction: %w", err)
@@ -1171,9 +1322,19 @@ func (ls *LocalStorage) MarkStaleExecutions(ctx context.Context, staleAfter time
 	defer rollbackTx(tx, "MarkStaleExecutions")
 
 	updateStmt, err := tx.PrepareContext(ctx, `
-		UPDATE executions
+		UPDATE executions AS e
 		SET status = ?, error_message = ?, completed_at = ?, duration_ms = ?, updated_at = ?
-		WHERE execution_id = ? AND status IN ('running', 'pending', 'queued')`)
+		WHERE e.execution_id = ?
+		  AND e.status IN ('running', 'pending', 'queued')
+		  AND `+executionUpdateTSExpr+` <= `+cutoffExpr+`
+		  AND NOT EXISTS (
+		      SELECT 1 FROM executions c
+		      WHERE c.parent_execution_id = e.execution_id
+		        AND (
+		            c.status IN ('running', 'pending', 'queued')
+		            OR (c.status != 'timeout' AND `+childRecencyTSExpr+` > `+cutoffExpr+`)
+		        )
+		  )`)
 	if err != nil {
 		return 0, fmt.Errorf("prepare stale execution update: %w", err)
 	}
@@ -1201,6 +1362,8 @@ func (ls *LocalStorage) MarkStaleExecutions(ctx context.Context, staleAfter time
 			durationMS,
 			now,
 			rec.id,
+			cutoff,
+			cutoff,
 		)
 		if err != nil {
 			return 0, fmt.Errorf("update stale execution %s: %w", rec.id, err)
@@ -1223,12 +1386,18 @@ func (ls *LocalStorage) MarkStaleExecutions(ctx context.Context, staleAfter time
 }
 
 // MarkStaleWorkflowExecutions updates workflow executions stuck in non-terminal states
-// when their updated_at timestamp exceeds the staleAfter threshold. This catches orphaned
-// child executions whose parent failed without cascading cancellation.
+// when both the workflow and its paired execution activity timestamps exceed the
+// staleAfter threshold. This catches orphaned child executions whose parent failed
+// without cascading cancellation while allowing activity recorded in either table
+// to keep the execution alive.
 //
 // See MarkStaleExecutions for the updated_at invariant, the COALESCE fallback
 // rationale, and why a row with a non-terminal child is skipped rather than reaped.
 func (ls *LocalStorage) MarkStaleWorkflowExecutions(ctx context.Context, staleAfter time.Duration, limit int) (int, error) {
+	return ls.markStaleWorkflowExecutions(ctx, staleAfter, limit, nil)
+}
+
+func (ls *LocalStorage) markStaleWorkflowExecutions(ctx context.Context, staleAfter time.Duration, limit int, afterCandidateSelection func()) (int, error) {
 	if limit <= 0 {
 		return 0, nil
 	}
@@ -1239,19 +1408,38 @@ func (ls *LocalStorage) MarkStaleWorkflowExecutions(ctx context.Context, staleAf
 	cutoff := time.Now().UTC().Add(-staleAfter)
 
 	db := ls.requireSQLDB()
+	workflowTSExpr := ls.staleTimestampExpr("COALESCE(w.updated_at, w.created_at, w.started_at)")
+	executionTSExpr := ls.staleTimestampExpr("COALESCE(e.updated_at, e.created_at, e.started_at)")
+	cutoffExpr := ls.staleTimestampExpr("?")
+	// A child workflow that reached a terminal state after the cutoff also
+	// shields its parent, covering the brief window between a child reporting
+	// success and the parent posting its own result (see issue #1059). A child
+	// that finished long before the cutoff no longer shields the parent, so a
+	// genuinely stuck parent workflow is still reaped.
+	childRecencyTSExpr := ls.childTerminalRecencyExpr()
+	// The legacy reaper runs first and makes its row terminal while updating
+	// updated_at. Terminal rows must not shield their still-active workflow row
+	// from this reaper, or the two tables could remain out of sync forever.
 	rows, err := db.QueryContext(ctx, `
-		SELECT execution_id, started_at
+		SELECT w.execution_id, w.started_at
 		FROM workflow_executions w
-		WHERE status IN ('running', 'pending', 'queued', 'waiting')
-		  AND COALESCE(updated_at, created_at, started_at) <= ?
-		  AND COALESCE(approval_status, '') != 'pending'
+		LEFT JOIN executions e
+		  ON e.execution_id = w.execution_id
+		 AND e.status IN ('running', 'pending', 'queued', 'waiting')
+		WHERE w.status IN ('running', 'pending', 'queued', 'waiting')
+		  AND `+workflowTSExpr+` <= `+cutoffExpr+`
+		  AND (e.execution_id IS NULL OR `+executionTSExpr+` <= `+cutoffExpr+`)
+		  AND COALESCE(w.approval_status, '') != 'pending'
 		  AND NOT EXISTS (
 		      SELECT 1 FROM workflow_executions c
 		      WHERE c.parent_execution_id = w.execution_id
-		        AND c.status IN ('running', 'pending', 'queued', 'waiting')
+		        AND (
+		            c.status IN ('running', 'pending', 'queued', 'waiting')
+		            OR (c.status != 'timeout' AND `+childRecencyTSExpr+` > `+cutoffExpr+`)
+		        )
 		  )
-		ORDER BY COALESCE(updated_at, created_at, started_at) ASC
-		LIMIT ?`, cutoff, limit)
+		ORDER BY `+workflowTSExpr+` ASC
+		LIMIT ?`, cutoff, cutoff, cutoff, limit)
 	if err != nil {
 		return 0, fmt.Errorf("query stale workflow executions: %w", err)
 	}
@@ -1278,6 +1466,12 @@ func (ls *LocalStorage) MarkStaleWorkflowExecutions(ctx context.Context, staleAf
 		return 0, nil
 	}
 
+	// Package tests use this seam to make the candidate-selection-to-update
+	// interleaving deterministic; production callers leave it nil.
+	if afterCandidateSelection != nil {
+		afterCandidateSelection()
+	}
+
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, fmt.Errorf("begin stale workflow execution transaction: %w", err)
@@ -1285,9 +1479,33 @@ func (ls *LocalStorage) MarkStaleWorkflowExecutions(ctx context.Context, staleAf
 	defer rollbackTx(tx, "MarkStaleWorkflowExecutions")
 
 	updateStmt, err := tx.PrepareContext(ctx, `
-		UPDATE workflow_executions
+		UPDATE workflow_executions AS w
 		SET status = ?, error_message = ?, completed_at = ?, duration_ms = ?, updated_at = ?
-		WHERE execution_id = ? AND status IN ('running', 'pending', 'queued', 'waiting')`)
+		WHERE w.execution_id = ?
+		  AND w.status IN ('running', 'pending', 'queued', 'waiting')
+		  AND `+workflowTSExpr+` <= `+cutoffExpr+`
+		  AND (
+		      NOT EXISTS (
+		          SELECT 1 FROM executions e
+		          WHERE e.execution_id = w.execution_id
+		            AND e.status IN ('running', 'pending', 'queued', 'waiting')
+		      )
+		      OR EXISTS (
+		          SELECT 1 FROM executions e
+		          WHERE e.execution_id = w.execution_id
+		            AND e.status IN ('running', 'pending', 'queued', 'waiting')
+		            AND `+executionTSExpr+` <= `+cutoffExpr+`
+		      )
+		  )
+		  AND COALESCE(w.approval_status, '') != 'pending'
+		  AND NOT EXISTS (
+		      SELECT 1 FROM workflow_executions c
+		      WHERE c.parent_execution_id = w.execution_id
+		        AND (
+		            c.status IN ('running', 'pending', 'queued', 'waiting')
+		            OR (c.status != 'timeout' AND `+childRecencyTSExpr+` > `+cutoffExpr+`)
+		        )
+		  )`)
 	if err != nil {
 		return 0, fmt.Errorf("prepare stale workflow execution update: %w", err)
 	}
@@ -1325,6 +1543,9 @@ func (ls *LocalStorage) MarkStaleWorkflowExecutions(ctx context.Context, staleAf
 			durationMS,
 			now,
 			rec.id,
+			cutoff,
+			cutoff,
+			cutoff,
 		)
 		if err != nil {
 			return 0, fmt.Errorf("update stale workflow execution %s: %w", rec.id, err)
@@ -1379,7 +1600,52 @@ func (ls *LocalStorage) MarkStaleWorkflowExecutions(ctx context.Context, staleAf
 // older code path reading it sees a consistent picture. We deliberately do
 // not write duration_ms here: the row's started_at is preserved, so consumers
 // that need the runtime can compute completed_at - started_at directly.
-func (ls *LocalStorage) MarkAgentExecutionsOrphaned(ctx context.Context, agentNodeID string, reasonMessage string) (int, error) {
+func (ls *LocalStorage) MarkAgentExecutionsOrphaned(ctx context.Context, agentNodeID, reasonMessage string) (int, error) {
+	return ls.markAgentExecutionsOrphaned(ctx, agentNodeID, "*", reasonMessage, time.Time{})
+}
+
+// MarkAgentInstanceExecutionsOrphaned limits restart cleanup to the departing
+// process plus legacy rows which predate per-execution instance stamping. A
+// non-zero createdBefore boundary excludes executions created after the
+// replacement registered; a zero boundary preserves the historical behavior.
+func (ls *LocalStorage) MarkAgentInstanceExecutionsOrphaned(ctx context.Context, agentNodeID, departingInstanceID, reasonMessage string, createdBefore time.Time) (int, error) {
+	return ls.markAgentExecutionsOrphaned(ctx, agentNodeID, departingInstanceID, reasonMessage, createdBefore)
+}
+
+// SetExecutionRestartedAs records the forward restart pointer on both
+// execution representations. The lightweight executions row is required; the
+// workflow row is updated when present for read-model parity.
+func (ls *LocalStorage) SetExecutionRestartedAs(ctx context.Context, sourceExecutionID, newExecutionID string) error {
+	sourceExecutionID = strings.TrimSpace(sourceExecutionID)
+	newExecutionID = strings.TrimSpace(newExecutionID)
+	if sourceExecutionID == "" || newExecutionID == "" {
+		return fmt.Errorf("source and successor execution_id are required")
+	}
+
+	db := ls.requireSQLDB()
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin restarted_as update: %w", err)
+	}
+	defer rollbackTx(tx, "SetExecutionRestartedAs:"+sourceExecutionID)
+
+	result, err := tx.ExecContext(ctx, `UPDATE executions SET restarted_as_execution_id = ?, updated_at = ? WHERE execution_id = ?`, newExecutionID, time.Now().UTC(), sourceExecutionID)
+	if err != nil {
+		return fmt.Errorf("update execution restarted_as: %w", err)
+	}
+	if affected, rowsErr := result.RowsAffected(); rowsErr == nil && affected == 0 {
+		return fmt.Errorf("execution %s not found", sourceExecutionID)
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE workflow_executions SET restarted_as_execution_id = ?, updated_at = ? WHERE execution_id = ?`, newExecutionID, time.Now().UTC(), sourceExecutionID); err != nil {
+		return fmt.Errorf("update workflow execution restarted_as: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit restarted_as update: %w", err)
+	}
+	return nil
+}
+
+func (ls *LocalStorage) markAgentExecutionsOrphaned(ctx context.Context, agentNodeID, departingInstanceID, reasonMessage string, createdBefore time.Time) (int, error) {
 	if strings.TrimSpace(agentNodeID) == "" {
 		return 0, fmt.Errorf("agent_node_id is required")
 	}
@@ -1389,16 +1655,27 @@ func (ls *LocalStorage) MarkAgentExecutionsOrphaned(ctx context.Context, agentNo
 
 	db := ls.requireSQLDB()
 	now := time.Now().UTC()
+	createdBeforeClause := ""
+	if !createdBefore.IsZero() {
+		createdBeforeClause = " AND " + ls.staleTimestampExpr("created_at") + " < " + ls.staleTimestampExpr("?")
+		createdBefore = createdBefore.UTC()
+	}
+	workflowArgs := []interface{}{
+		types.ExecutionStatusFailed, reasonMessage, reasonMessage, now, now, agentNodeID, departingInstanceID, departingInstanceID,
+		types.ExecutionReasonAwaitingAgentRestart,
+	}
+	if createdBeforeClause != "" {
+		workflowArgs = append(workflowArgs, createdBefore)
+	}
 
 	res, err := db.ExecContext(ctx, `
 		UPDATE workflow_executions
 		SET status = ?, status_reason = ?, error_message = ?, completed_at = ?, updated_at = ?
 		WHERE agent_node_id = ?
+		  AND (? = '*' OR COALESCE(instance_id, '') = '' OR instance_id = ?)
 		  AND status IN ('running', 'pending', 'queued', 'waiting')
-		  AND COALESCE(status_reason, '') <> ?`,
-		types.ExecutionStatusFailed, reasonMessage, reasonMessage, now, now, agentNodeID,
-		types.ExecutionReasonAwaitingAgentRestart,
-	)
+		  AND COALESCE(status_reason, '') <> ?`+createdBeforeClause,
+		workflowArgs...)
 	if err != nil {
 		return 0, fmt.Errorf("update orphaned workflow executions: %w", err)
 	}
@@ -1408,23 +1685,30 @@ func (ls *LocalStorage) MarkAgentExecutionsOrphaned(ctx context.Context, agentNo
 	// intentionally swallowed: workflow_executions is the source of truth,
 	// and the legacy mirror is allowed to lag without blocking restart
 	// recovery.
+	executionArgs := append([]interface{}(nil), workflowArgs...)
 	_, _ = db.ExecContext(ctx, `
 		UPDATE executions
 		SET status = ?, status_reason = ?, error_message = ?, completed_at = ?, updated_at = ?
 		WHERE agent_node_id = ?
+		  AND (? = '*' OR COALESCE(instance_id, '') = '' OR instance_id = ?)
 		  AND status IN ('running', 'pending', 'queued', 'waiting')
-		  AND COALESCE(status_reason, '') <> ?`,
-		types.ExecutionStatusFailed, reasonMessage, reasonMessage, now, now, agentNodeID,
-		types.ExecutionReasonAwaitingAgentRestart,
-	)
+		  AND COALESCE(status_reason, '') <> ?`+createdBeforeClause,
+		executionArgs...)
 
 	return int(affected), nil
 }
 
 // RetryStaleWorkflowExecutions finds stale workflow executions that haven't exceeded
 // maxRetries and resets both workflow_executions and executions back to "pending"
-// so the paired records stay in sync for the retry path.
+// so the paired records stay in sync for the retry path. The candidate predicates
+// are repeated in both conditional updates, so activity after selection — including
+// a heartbeat landing between the workflow and execution statements — prevents a retry.
+// A candidate is only committed and reported as retried when both records move.
 func (ls *LocalStorage) RetryStaleWorkflowExecutions(ctx context.Context, staleAfter time.Duration, maxRetries int, limit int) ([]string, error) {
+	return ls.retryStaleWorkflowExecutions(ctx, staleAfter, maxRetries, limit, nil)
+}
+
+func (ls *LocalStorage) retryStaleWorkflowExecutions(ctx context.Context, staleAfter time.Duration, maxRetries int, limit int, afterCandidateSelection func()) ([]string, error) {
 	if limit <= 0 || maxRetries <= 0 {
 		return nil, nil
 	}
@@ -1434,15 +1718,38 @@ func (ls *LocalStorage) RetryStaleWorkflowExecutions(ctx context.Context, staleA
 
 	cutoff := time.Now().UTC().Add(-staleAfter)
 	db := ls.requireSQLDB()
+	workflowTSExpr := ls.staleTimestampExpr("COALESCE(w.updated_at, w.created_at, w.started_at)")
+	executionTSExpr := ls.staleTimestampExpr("COALESCE(e.updated_at, e.created_at, e.started_at)")
+	cutoffExpr := ls.staleTimestampExpr("?")
+	// A child that reached a terminal state after the cutoff shields its parent
+	// for one stale window, covering the gap between a child reporting success
+	// and the parent posting its own result. Without this the retry sweep — which
+	// runs before both reapers when max_retries > 0 — resets a live parent to
+	// pending mid-flight (issue #1059). timeout children are excluded so the
+	// reaper's own kills cannot perpetuate a shield.
+	childRecencyTSExpr := ls.childTerminalRecencyExpr()
 
 	rows, err := db.QueryContext(ctx, `
-		SELECT execution_id
-		FROM workflow_executions
-		WHERE status IN ('running', 'pending', 'queued')
-		  AND retry_count < ?
-		  AND COALESCE(updated_at, created_at, started_at) <= ?
-		ORDER BY COALESCE(updated_at, created_at, started_at) ASC
-		LIMIT ?`, maxRetries, cutoff, limit)
+		SELECT w.execution_id
+		FROM workflow_executions w
+		LEFT JOIN executions e
+		  ON e.execution_id = w.execution_id
+		 AND e.status IN ('running', 'pending', 'queued', 'waiting')
+		WHERE w.status IN ('running', 'pending', 'queued')
+		  AND w.retry_count < ?
+		  AND `+workflowTSExpr+` <= `+cutoffExpr+`
+		  AND (e.execution_id IS NULL OR `+executionTSExpr+` <= `+cutoffExpr+`)
+		  AND COALESCE(w.approval_status, '') != 'pending'
+		  AND NOT EXISTS (
+		      SELECT 1 FROM workflow_executions c
+		      WHERE c.parent_execution_id = w.execution_id
+		        AND (
+		            c.status IN ('running', 'pending', 'queued', 'waiting')
+		            OR (c.status != 'timeout' AND `+childRecencyTSExpr+` > `+cutoffExpr+`)
+		        )
+		  )
+		ORDER BY `+workflowTSExpr+` ASC
+		LIMIT ?`, maxRetries, cutoff, cutoff, cutoff, limit)
 	if err != nil {
 		return nil, fmt.Errorf("query retriable workflow executions: %w", err)
 	}
@@ -1464,6 +1771,12 @@ func (ls *LocalStorage) RetryStaleWorkflowExecutions(ctx context.Context, staleA
 		return nil, nil
 	}
 
+	// Package tests use this seam to make the candidate-selection-to-update
+	// interleaving deterministic; production callers leave it nil.
+	if afterCandidateSelection != nil {
+		afterCandidateSelection()
+	}
+
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin retry transaction: %w", err)
@@ -1474,34 +1787,77 @@ func (ls *LocalStorage) RetryStaleWorkflowExecutions(ctx context.Context, staleA
 	retryReason := "auto-retry after stale timeout"
 
 	workflowStmt, err := tx.PrepareContext(ctx, `
-		UPDATE workflow_executions
+		UPDATE workflow_executions AS w
 		SET status = 'pending',
 		    retry_count = retry_count + 1,
 		    error_message = ?,
 		    completed_at = NULL,
 		    updated_at = ?
-		WHERE execution_id = ? AND status IN ('running', 'pending', 'queued')`)
+		WHERE w.execution_id = ?
+		  AND w.status IN ('running', 'pending', 'queued')
+		  AND w.retry_count < ?
+		  AND `+workflowTSExpr+` <= `+cutoffExpr+`
+		  AND (
+		      NOT EXISTS (
+		          SELECT 1 FROM executions e
+		          WHERE e.execution_id = w.execution_id
+		            AND e.status IN ('running', 'pending', 'queued', 'waiting')
+		      )
+		      OR EXISTS (
+		          SELECT 1 FROM executions e
+		          WHERE e.execution_id = w.execution_id
+		            AND e.status IN ('running', 'pending', 'queued', 'waiting')
+		            AND `+executionTSExpr+` <= `+cutoffExpr+`
+		      )
+		  )
+		  AND COALESCE(w.approval_status, '') != 'pending'
+		  AND NOT EXISTS (
+		      SELECT 1 FROM workflow_executions c
+		      WHERE c.parent_execution_id = w.execution_id
+		        AND (
+		            c.status IN ('running', 'pending', 'queued', 'waiting')
+		            OR (c.status != 'timeout' AND `+childRecencyTSExpr+` > `+cutoffExpr+`)
+		        )
+		  )`)
 	if err != nil {
 		return nil, fmt.Errorf("prepare retry statement: %w", err)
 	}
 	defer workflowStmt.Close()
 
+	// The execution update repeats the staleness predicate: a heartbeat can
+	// land between the workflow guard above and this statement, and the fresh
+	// execution must not be dragged back to pending.
 	executionStmt, err := tx.PrepareContext(ctx, `
-		UPDATE executions
+		UPDATE executions AS e
 		SET status = 'pending',
 		    error_message = ?,
 		    completed_at = NULL,
 		    duration_ms = NULL,
 		    updated_at = ?
-		WHERE execution_id = ? AND status IN ('running', 'pending', 'queued')`)
+		WHERE e.execution_id = ?
+		  AND e.status IN ('running', 'pending', 'queued')
+		  AND `+executionTSExpr+` <= `+cutoffExpr)
 	if err != nil {
 		return nil, fmt.Errorf("prepare execution retry statement: %w", err)
 	}
 	defer executionStmt.Close()
 
+	// Each candidate is wrapped in a savepoint so it can be undone as a unit:
+	// when the paired execution update loses to activity that arrived between
+	// the two statements, the workflow half must not be committed either.
+	const retryCandidateSavepoint = "retry_stale_candidate"
+	releaseCandidate := func() error {
+		_, err := tx.ExecContext(ctx, "RELEASE SAVEPOINT "+retryCandidateSavepoint)
+		return err
+	}
+
 	var retried []string
 	for _, id := range ids {
-		result, err := workflowStmt.ExecContext(ctx, retryReason, now, id)
+		if _, err := tx.ExecContext(ctx, "SAVEPOINT "+retryCandidateSavepoint); err != nil {
+			return retried, fmt.Errorf("savepoint for retry candidate %s: %w", id, err)
+		}
+
+		result, err := workflowStmt.ExecContext(ctx, retryReason, now, id, maxRetries, cutoff, cutoff, cutoff)
 		if err != nil {
 			return retried, fmt.Errorf("retry workflow execution %s: %w", id, err)
 		}
@@ -1510,11 +1866,50 @@ func (ls *LocalStorage) RetryStaleWorkflowExecutions(ctx context.Context, staleA
 			return retried, fmt.Errorf("rows affected for workflow execution %s: %w", id, err)
 		}
 		if affected == 0 {
+			if err := releaseCandidate(); err != nil {
+				return retried, fmt.Errorf("release savepoint for workflow execution %s: %w", id, err)
+			}
 			continue
 		}
 
-		if _, err := executionStmt.ExecContext(ctx, retryReason, now, id); err != nil {
+		execResult, err := executionStmt.ExecContext(ctx, retryReason, now, id, cutoff)
+		if err != nil {
 			return retried, fmt.Errorf("retry execution %s: %w", id, err)
+		}
+		execAffected, err := execResult.RowsAffected()
+		if err != nil {
+			return retried, fmt.Errorf("rows affected for execution %s: %w", id, err)
+		}
+		if execAffected == 0 {
+			// The paired execution did not move. A heartbeat landing between
+			// the statements leaves it active but no longer stale, and the
+			// workflow half must be rolled back so the candidate stays
+			// all-or-nothing. The pre-existing workflow-only paths (no paired
+			// row, terminal row, or waiting row) keep their old outcome.
+			var wokeBetweenStatements bool
+			err = tx.QueryRowContext(ctx, `
+				SELECT EXISTS (
+				    SELECT 1 FROM executions AS e
+				    WHERE e.execution_id = ?
+				      AND e.status IN ('running', 'pending', 'queued')
+				      AND `+executionTSExpr+` > `+cutoffExpr+`
+				)`, id, cutoff).Scan(&wokeBetweenStatements)
+			if err != nil {
+				return retried, fmt.Errorf("check execution activity for %s: %w", id, err)
+			}
+			if wokeBetweenStatements {
+				if _, err := tx.ExecContext(ctx, "ROLLBACK TO SAVEPOINT "+retryCandidateSavepoint); err != nil {
+					return retried, fmt.Errorf("rollback retry candidate %s: %w", id, err)
+				}
+				if err := releaseCandidate(); err != nil {
+					return retried, fmt.Errorf("release rolled-back savepoint for %s: %w", id, err)
+				}
+				continue
+			}
+		}
+
+		if err := releaseCandidate(); err != nil {
+			return retried, fmt.Errorf("release savepoint for retry candidate %s: %w", id, err)
 		}
 		retried = append(retried, id)
 	}
@@ -1533,6 +1928,7 @@ func scanExecution(scanner interface {
 		exec                         types.Execution
 		parentExecutionID, sessionID sql.NullString
 		actorID                      sql.NullString
+		restartedAsExecutionID       sql.NullString
 		inputURI                     sql.NullString
 		resultURI                    sql.NullString
 		statusReason                 sql.NullString
@@ -1549,6 +1945,8 @@ func scanExecution(scanner interface {
 		&exec.RunID,
 		&parentExecutionID,
 		&exec.AgentNodeID,
+		&exec.InstanceID,
+		&restartedAsExecutionID,
 		&exec.ReasonerID,
 		&exec.NodeID,
 		&exec.Status,
@@ -1576,6 +1974,9 @@ func scanExecution(scanner interface {
 
 	if parentExecutionID.Valid {
 		exec.ParentExecutionID = &parentExecutionID.String
+	}
+	if restartedAsExecutionID.Valid {
+		exec.RestartedAsExecutionID = &restartedAsExecutionID.String
 	}
 	if sessionID.Valid {
 		exec.SessionID = &sessionID.String

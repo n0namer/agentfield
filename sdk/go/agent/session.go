@@ -1,20 +1,28 @@
 package agent
 
+import "reflect"
+
 type SessionDefinition struct {
-	Name         string         `json:"name"`
-	Provider     string         `json:"provider"`
-	Transport    string         `json:"transport"`
-	Model        string         `json:"model,omitempty"`
-	Modalities   []string       `json:"modalities"`
-	Voice        string         `json:"voice,omitempty"`
-	Tools        []string       `json:"tools"`
-	Tags         []string       `json:"tags,omitempty"`
-	ProposedTags []string       `json:"proposed_tags,omitempty"`
-	ApprovedTags []string       `json:"approved_tags,omitempty"`
-	Metadata     map[string]any `json:"metadata"`
+	Name          string         `json:"name"`
+	Provider      string         `json:"provider"`
+	Transport     string         `json:"transport"`
+	Model         string         `json:"model,omitempty"`
+	Modalities    []string       `json:"modalities"`
+	TurnDetection *TurnDetection `json:"turn_detection,omitempty"`
+	Voice         string         `json:"voice,omitempty"`
+	Tools         []string       `json:"tools"`
+	Tags          []string       `json:"tags,omitempty"`
+	ProposedTags  []string       `json:"proposed_tags,omitempty"`
+	ApprovedTags  []string       `json:"approved_tags,omitempty"`
+	Metadata      map[string]any `json:"metadata"`
 }
 
 type SessionOption func(*SessionDefinition)
+
+// WithSessionTurnDetection sets VAD options; RegisterSession validates them.
+func WithSessionTurnDetection(config TurnDetection) SessionOption {
+	return func(s *SessionDefinition) { s.TurnDetection = &config }
+}
 
 func WithSessionModel(model string) SessionOption {
 	return func(s *SessionDefinition) { s.Model = model }
@@ -90,6 +98,10 @@ func (a *Agent) RegisterSession(name string, provider string, transport string, 
 		definition.Metadata = map[string]any{}
 	}
 
+	definition.TurnDetection, err = NormalizeTurnDetection(definition.Provider, definition.Transport, definition.TurnDetection)
+	if err != nil {
+		return err
+	}
 	a.sessions[name] = definition
 	return nil
 }
@@ -97,7 +109,103 @@ func (a *Agent) RegisterSession(name string, provider string, transport string, 
 func (a *Agent) SessionDefinitions() []SessionDefinition {
 	sessions := make([]SessionDefinition, 0, len(a.sessions))
 	for _, session := range a.sessions {
-		sessions = append(sessions, session)
+		sessions = append(sessions, cloneSessionDefinition(session))
 	}
 	return sessions
+}
+
+func cloneSessionDefinition(session SessionDefinition) SessionDefinition {
+	cloned := session
+	cloned.Modalities = append([]string(nil), session.Modalities...)
+	cloned.Tools = append([]string(nil), session.Tools...)
+	cloned.Tags = append([]string(nil), session.Tags...)
+	cloned.ProposedTags = append([]string(nil), session.ProposedTags...)
+	cloned.ApprovedTags = append([]string(nil), session.ApprovedTags...)
+	cloned.Metadata = cloneSessionMetadata(session.Metadata)
+	if session.TurnDetection != nil {
+		config := *session.TurnDetection
+		config.Threshold = cloneSessionPointer(config.Threshold)
+		config.PrefixPaddingMS = cloneSessionPointer(config.PrefixPaddingMS)
+		config.SilenceDurationMS = cloneSessionPointer(config.SilenceDurationMS)
+		config.CreateResponse = cloneSessionPointer(config.CreateResponse)
+		config.InterruptResponse = cloneSessionPointer(config.InterruptResponse)
+		cloned.TurnDetection = &config
+	}
+	return cloned
+}
+
+func cloneSessionPointer[T any](value *T) *T {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
+}
+
+type sessionMetadataCopyReference struct {
+	kind   reflect.Kind
+	typeOf reflect.Type
+	ptr    uintptr
+	length int
+	cap    int
+}
+
+// cloneSessionMetadata recursively copies maps and slices stored in metadata.
+// It keeps a copy of each encountered reference so cyclic metadata remains
+// detached without recursing forever. Other kinds are returned unchanged.
+func cloneSessionMetadata(metadata map[string]any) map[string]any {
+	if metadata == nil {
+		return nil
+	}
+	return cloneSessionMetadataValue(
+		reflect.ValueOf(metadata),
+		make(map[sessionMetadataCopyReference]reflect.Value),
+	).Interface().(map[string]any)
+}
+
+func cloneSessionMetadataValue(value reflect.Value, copied map[sessionMetadataCopyReference]reflect.Value) reflect.Value {
+	switch value.Kind() {
+	case reflect.Interface:
+		if value.IsNil() {
+			return reflect.Zero(value.Type())
+		}
+		cloned := cloneSessionMetadataValue(value.Elem(), copied)
+		result := reflect.New(value.Type()).Elem()
+		result.Set(cloned)
+		return result
+	case reflect.Map:
+		if value.IsNil() {
+			return reflect.Zero(value.Type())
+		}
+		ref := sessionMetadataCopyReference{kind: value.Kind(), typeOf: value.Type(), ptr: value.Pointer()}
+		if existing, found := copied[ref]; found {
+			return existing
+		}
+		result := reflect.MakeMapWithSize(value.Type(), value.Len())
+		copied[ref] = result
+		iter := value.MapRange()
+		for iter.Next() {
+			result.SetMapIndex(iter.Key(), cloneSessionMetadataValue(iter.Value(), copied))
+		}
+		return result
+	case reflect.Slice:
+		if value.IsNil() {
+			return reflect.Zero(value.Type())
+		}
+		ref := sessionMetadataCopyReference{
+			kind: value.Kind(), typeOf: value.Type(), ptr: value.Pointer(),
+			length: value.Len(), cap: value.Cap(),
+		}
+		if existing, found := copied[ref]; found {
+			return existing
+		}
+		result := reflect.MakeSlice(value.Type(), value.Len(), value.Len())
+		copied[ref] = result
+		for i := 0; i < value.Len(); i++ {
+			result.Index(i).Set(cloneSessionMetadataValue(value.Index(i), copied))
+		}
+		return result
+	default:
+		return value
+	}
 }

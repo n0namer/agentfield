@@ -30,14 +30,6 @@ var terminalStatuses = []string{
 	types.ExecutionStatusCancelled,
 }
 
-// semiTerminalStatuses lists states that are terminal-like but allow specific
-// recovery transitions. For example, timeout allows transitions to running
-// (stale execution reaper may timeout executions that are still active, e.g.
-// waiting for HITL approval) and cancelled.
-var semiTerminalStatuses = []string{
-	types.ExecutionStatusTimeout,
-}
-
 // ---------------------------------------------------------------------------
 // Terminal irreversibility
 // ---------------------------------------------------------------------------
@@ -204,6 +196,12 @@ func TestInvariant_ExecutionState_KnownValidTransitions(t *testing.T) {
 		{types.ExecutionStatusPending, types.ExecutionStatusRunning},
 		{types.ExecutionStatusPending, types.ExecutionStatusCancelled},
 		{types.ExecutionStatusQueued, types.ExecutionStatusRunning},
+		{types.ExecutionStatusQueued, types.ExecutionStatusWaiting},
+		{types.ExecutionStatusQueued, types.ExecutionStatusPaused},
+		{types.ExecutionStatusQueued, types.ExecutionStatusSucceeded},
+		{types.ExecutionStatusQueued, types.ExecutionStatusFailed},
+		{types.ExecutionStatusQueued, types.ExecutionStatusCancelled},
+		{types.ExecutionStatusQueued, types.ExecutionStatusTimeout},
 		{types.ExecutionStatusRunning, types.ExecutionStatusSucceeded},
 		{types.ExecutionStatusRunning, types.ExecutionStatusFailed},
 		{types.ExecutionStatusRunning, types.ExecutionStatusCancelled},
@@ -238,7 +236,6 @@ func TestInvariant_ExecutionState_KnownInvalidTransitions(t *testing.T) {
 		{types.ExecutionStatusTimeout, types.ExecutionStatusPending},
 		{types.ExecutionStatusTimeout, types.ExecutionStatusSucceeded},
 		{types.ExecutionStatusPending, types.ExecutionStatusSucceeded}, // must go through running
-		{types.ExecutionStatusQueued, types.ExecutionStatusSucceeded},
 	}
 
 	for _, pair := range invalid {

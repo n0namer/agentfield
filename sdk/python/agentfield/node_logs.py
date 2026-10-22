@@ -4,6 +4,7 @@ Bounded in-memory process log capture (stdout/stderr) and HTTP NDJSON API for Ag
 
 from __future__ import annotations
 
+import asyncio
 import json
 import io
 import os
@@ -14,7 +15,16 @@ import threading
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Deque, Iterable, Iterator, List, Optional, TextIO, cast
+from typing import (
+    AsyncIterator,
+    Deque,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    TextIO,
+    cast,
+)
 
 from .lock_utils import timed_lock
 
@@ -88,10 +98,10 @@ class ProcessLogRing:
 
     def append(self, stream: str, text: str, max_line_bytes: int) -> None:
         raw = text
+        raw_bytes = raw.encode("utf-8")
         truncated = False
-        if len(raw.encode("utf-8")) > max_line_bytes:
-            raw_bytes = raw.encode("utf-8")[:max_line_bytes]
-            raw = raw_bytes.decode("utf-8", errors="replace")
+        if len(raw_bytes) > max_line_bytes:
+            raw = raw_bytes[:max_line_bytes].decode("utf-8", errors="replace")
             truncated = True
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
         with timed_lock(self._lock, "node_logs"):
@@ -141,16 +151,20 @@ class _TeeTextIO(io.TextIOBase):
         self._ring = ring
         self._max_line_bytes = max_line_bytes
         self._buf = ""
+        self._write_lock = threading.Lock()
 
     def write(self, s: str) -> int:
         if not s:
             return 0
-        self._original.write(s)
-        self._buf += s
-        while "\n" in self._buf:
-            line, self._buf = self._buf.split("\n", 1)
-            if line or True:
-                self._ring.append(self._stream_name, line, self._max_line_bytes)
+        with self._write_lock:
+            self._original.write(s)
+            self._buf += s
+            while "\n" in self._buf:
+                line, self._buf = self._buf.split("\n", 1)
+                try:
+                    self._ring.append(self._stream_name, line, self._max_line_bytes)
+                except Exception:
+                    pass
         return len(s)
 
     def writelines(self, lines: Iterable[str]) -> None:  # type: ignore[override]
@@ -158,7 +172,8 @@ class _TeeTextIO(io.TextIOBase):
             self.write(line)
 
     def flush(self) -> None:
-        self._original.flush()
+        with self._write_lock:
+            self._original.flush()
 
     def fileno(self) -> int:
         return self._original.fileno()
@@ -175,9 +190,15 @@ class _TeeTextIO(io.TextIOBase):
     def close(self) -> None:
         if self.closed:
             return
-        if self._buf:
-            self._ring.append(self._stream_name, self._buf, self._max_line_bytes)
-            self._buf = ""
+        with self._write_lock:
+            if self._buf:
+                try:
+                    self._ring.append(
+                        self._stream_name, self._buf, self._max_line_bytes
+                    )
+                except Exception:
+                    pass
+                self._buf = ""
         super().close()
 
     @property
@@ -190,6 +211,7 @@ class _TeeTextIO(io.TextIOBase):
 
 _global_ring: Optional[ProcessLogRing] = None
 _tee_installed = False
+_installed_tees: List[_TeeTextIO] = []
 
 
 def logs_enabled() -> bool:
@@ -222,14 +244,40 @@ def get_ring() -> ProcessLogRing:
 
 def install_stdio_tee() -> None:
     """Replace sys.stdout/sys.stderr with tees into the process log ring."""
-    global _tee_installed
+    global _installed_tees, _tee_installed
     if _tee_installed or not logs_enabled():
         return
     ring = get_ring()
     ml = max_line_bytes()
-    sys.stdout = _TeeTextIO("stdout", cast(TextIO, sys.__stdout__), ring, ml)
-    sys.stderr = _TeeTextIO("stderr", cast(TextIO, sys.__stderr__), ring, ml)
+    stdout_tee = _TeeTextIO("stdout", cast(TextIO, sys.__stdout__), ring, ml)
+    stderr_tee = _TeeTextIO("stderr", cast(TextIO, sys.__stderr__), ring, ml)
+    _installed_tees = [stdout_tee, stderr_tee]
+    sys.stdout = stdout_tee
+    sys.stderr = stderr_tee
     _tee_installed = True
+
+
+def _after_fork_child() -> None:
+    """Replace locks whose owning threads do not survive into a fork child."""
+    global _follow_lock, _follow_queues
+
+    rings: List[ProcessLogRing] = []
+    for tee in _installed_tees:
+        tee._write_lock = threading.Lock()
+        tee._buf = ""
+        if all(tee._ring is not ring for ring in rings):
+            rings.append(tee._ring)
+    if _global_ring is not None and all(_global_ring is not ring for ring in rings):
+        rings.append(_global_ring)
+    for ring in rings:
+        ring._lock = threading.Lock()
+
+    _follow_lock = threading.Lock()
+    _follow_queues = []
+
+
+if hasattr(os, "register_at_fork"):
+    os.register_at_fork(after_in_child=_after_fork_child)
 
 
 def verify_internal_bearer(authorization_header: Optional[str]) -> bool:
@@ -277,3 +325,30 @@ def iter_tail_ndjson(
                 last_seq = e.seq
     finally:
         unregister_follow_queue(q)
+
+
+async def async_iter_tail_ndjson(
+    tail_lines: int,
+    since_seq: int,
+    follow: bool,
+) -> AsyncIterator[bytes]:
+    """Async process-log stream; idle followers consume no worker-pool thread."""
+    ring = get_ring()
+    if since_seq > 0:
+        entries = ring.snapshot_after(
+            since_seq, limit=tail_lines if tail_lines > 0 else None
+        )
+    else:
+        entries = ring.tail(tail_lines if tail_lines > 0 else 200)
+    for entry in entries:
+        yield entry.to_ndjson_line()
+    if not follow:
+        return
+
+    last_seq = entries[-1].seq if entries else since_seq
+    while True:
+        await asyncio.sleep(0.5)
+        newer = ring.snapshot_after(last_seq, limit=None)
+        for entry in newer:
+            yield entry.to_ndjson_line()
+            last_seq = entry.seq
