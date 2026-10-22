@@ -286,14 +286,16 @@ class HarnessConfig(BaseModel):
         description=(
             'Coding agent provider: "aforge" (default) | "claude-code" | "codex" | '
             '"gemini" | "opencode" | "grok" | "pi" | "omp". Unset resolves to '
-            'the AGENTFIELD_HARNESS_PROVIDER env var when present, else "aforge".'
+            'the AGENTFIELD_HARNESS_PROVIDER env var when present, else a platform '
+            'default (codex on Windows, opencode elsewhere).'
         ),
     )
     model: Optional[str] = Field(
         default=None,
         description=(
             "Model identifier. None/empty means the provider's own default "
-            "(aforge picks its own; claude-code uses sonnet)."
+            "unless the runner supplies the platform default (gpt-5.6-luna on "
+            "Windows, broker/fast-coding elsewhere)."
         ),
     )
     variant: Optional[str] = Field(
