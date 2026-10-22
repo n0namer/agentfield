@@ -25,7 +25,8 @@
 // No electron imports: the bundled path is injected by main, so probing,
 // selection, and provisioning stay unit-testable.
 
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { promisify } from 'node:util'
 import { existsSync, promises as fs } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -146,7 +147,7 @@ export function probeCli(candidate: CliCandidate): Promise<ProbedCandidate> {
     // the whole probeAll — the app hangs before creating its tray or window.
     let child: ChildProcessWithoutNullStreams
     try {
-      child = spawn(candidate.command, ['version'], { windowsHide: true, env: childEnv() })
+      child = spawn(candidate.command, ['version'], { shell: false, windowsHide: true, env: childEnv() })
     } catch {
       done(false)
       return
@@ -310,14 +311,51 @@ export async function installBundledCli(bundledPath: string): Promise<AgentActio
  * registerPosixUserPath below.
  */
 function registerWindowsUserPath(binDir: string): void {
-  const script =
-    `$p = [Environment]::GetEnvironmentVariable('Path', 'User'); ` +
-    `if (($p -split ';') -notcontains '${binDir}') { ` +
-    `[Environment]::SetEnvironmentVariable('Path', "$p;${binDir}", 'User') }`
-  spawn('powershell', ['-NoProfile', '-NonInteractive', '-Command', script], {
-    windowsHide: true,
-    stdio: 'ignore'
-  }).on('error', () => {})
+  void updateWindowsUserPath(binDir).catch(() => {})
+}
+
+const execFileAsync = promisify(execFile)
+
+export type WindowsPathValueType = 'REG_SZ' | 'REG_EXPAND_SZ'
+export interface WindowsPathValue { type: WindowsPathValueType; value: string }
+
+export function parseWindowsPathValue(output: string): WindowsPathValue | null {
+  const line = output.split(/\r?\n/).find((entry) => /\sPath\s+REG_(?:SZ|EXPAND_SZ)\s+/i.test(entry))
+  const match = line && /^.*?\s+Path\s+(REG_SZ|REG_EXPAND_SZ)\s+(.*)\s*$/i.exec(line)
+  return match ? { type: match[1].toUpperCase() as WindowsPathValueType, value: match[2] } : null
+}
+
+export function normalizeWindowsPathEntry(entry: string): string {
+  return entry.trim().replaceAll('/', '\\').replace(/[\\]+$/, '').toLowerCase()
+}
+
+export function windowsPathContains(entries: readonly string[], candidate: string): boolean {
+  const normalized = normalizeWindowsPathEntry(candidate)
+  return entries.some((entry) => normalizeWindowsPathEntry(entry) === normalized)
+}
+
+async function updateWindowsUserPath(binDir: string): Promise<void> {
+  const key = 'HKCU\\Environment'
+  let current = ''
+  let type: WindowsPathValueType = 'REG_EXPAND_SZ'
+  try {
+    const result = await execFileAsync('reg.exe', ['query', key, '/v', 'Path'], {
+      shell: false,
+      windowsHide: true,
+      encoding: 'utf8'
+    })
+    const parsed = parseWindowsPathValue(result.stdout)
+    current = parsed?.value ?? ''
+    type = parsed?.type ?? type
+  } catch {
+    // A missing user Path is equivalent to an empty one.
+  }
+  const entries = current.split(';').map((entry) => entry.trim()).filter(Boolean)
+  if (windowsPathContains(entries, binDir)) return
+  await execFileAsync('reg.exe', [
+    'add', key, '/v', 'Path', '/t', type,
+    '/d', [...entries, binDir].join(';'), '/f'
+  ], { shell: false, windowsHide: true, stdio: 'ignore' })
 }
 
 export interface PosixPathEntry {

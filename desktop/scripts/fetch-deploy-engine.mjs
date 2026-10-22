@@ -30,7 +30,7 @@ async function BunlessWrite(path, bytes) {
 
 function command(program, args) {
   return new Promise((resolveCommand, reject) => {
-    const child = spawn(program, args, { stdio: 'inherit' })
+    const child = spawn(program, args, { stdio: 'inherit', shell: false, windowsHide: true })
     child.on('error', reject)
     child.on('close', (code) => code === 0 ? resolveCommand() : reject(new Error(`${program} exited with ${code}`)))
   })
@@ -38,13 +38,9 @@ function command(program, args) {
 
 async function extract(zip, directory) {
   await mkdir(directory, { recursive: true })
-  if (process.platform === 'win32') {
-    const escapedZip = zip.replaceAll("'", "''")
-    const escapedDir = directory.replaceAll("'", "''")
-    await command('powershell.exe', ['-NoProfile', '-Command', `Expand-Archive -LiteralPath '${escapedZip}' -DestinationPath '${escapedDir}' -Force`])
-  } else {
-    await command('unzip', ['-o', zip, '-d', directory])
-  }
+  const program = process.platform === 'win32' ? 'tar.exe' : 'unzip'
+  const args = process.platform === 'win32' ? ['-xf', zip, '-C', directory] : ['-o', zip, '-d', directory]
+  await command(program, args)
 }
 
 try {
