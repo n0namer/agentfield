@@ -1,0 +1,40 @@
+{
+  "goal": "Agent.harness(provider=codex, model=gpt-5.6-luna, variant=low) on A55: plain and schema read-only calls, isolated retries, direct Windows launch, and explicit workspace-write mapping.",
+  "verdict": "WORKING",
+  "scope": "Only the supervisor-listed AgentField harness, tests, Go regression assertions, and result files were changed. No shared Ruflo/OpenCodex infrastructure, credentials, commit, push, or deploy was mutated.",
+  "repairs": [
+    "Read-only Codex schema calls allocate no AgentField output directory and validate/retry strictly from stdout; file-oriented schema prompts, file diagnostics, and AI repair are bypassed.",
+    "Windows bare codex, codex.cmd, and codex.ps1 discover the npm-installed codex.js beside the shim and execute direct node argv. Explicit .js and native executables remain supported; an unresolved shim fails closed.",
+    "The WinError 5 direct-Popen fallback remains shell-free and now keeps wall and idle deadlines, cancellation-triggered process-tree termination, bounded capture, and deterministic TemporaryFile cleanup. A caller may supply AGENTFIELD_HARNESS_TEMP_DIR for its disposable writable handles.",
+    "Stale direct aforge assertions now use platform resolution; Windows remains Codex/Luna/low and Unix remains OpenCode. No claim is made that legacy Go modes were removed."
+  ],
+  "live_evidence": {
+    "route": "Local OpenAI-compatible endpoint via direct node + codex.js; existing access token was read only in process memory and never printed or persisted.",
+    "explicit_entrypoint": {
+      "plain": "LUNA_SDK_PLAIN_OK",
+      "schema": {"greeting": "Luna", "number": 56},
+      "sessions": ["01a10dc2-05f7-72f2-9e39-27f17a97b9ff", "01a10dc2-3bc6-7bc0-93c6-ab18e23bc8d7"]
+    },
+    "bare_launcher_without_CODEX_MANAGED_PACKAGE_ROOT": {
+      "resolved_argv": ["C:\\Program Files\\nodejs\\node.EXE", "d:\\npm-global\\node_modules\\@openai\\codex\\bin\\codex.js"],
+      "plain": "LUNA_BARE_OK",
+      "model": "gpt-5.6-luna",
+      "variant": "low"
+    }
+  },
+  "tests": [
+    {"command": "focused schema stdout tests + read-only retry regression + test_harness_provider_codex.py", "result": "PASS: 26 passed"},
+    {"command": "sdk/python/.venv/Scripts/python.exe -m compileall -q sdk/python/agentfield", "result": "PASS"},
+    {"command": "broader schema/runner/provider/defaults/types pytest selection", "result": "146 passed; tmp_path setup/cleanup was blocked by host WinError 5 ACL on pytest temporary directories, not assertion failures"}
+  ],
+  "write_contract": {
+    "plan_or_none": "--sandbox read-only; schema replies and retries are stdout-only",
+    "auto": "--sandbox workspace-write; file-backed schema behavior remains available only for this explicit mode",
+    "live_auto_canary": "Not performed: the exact writable scope excludes creating a canary workspace artifact, and the managed outer session is read-only. Provider command mapping is covered by focused tests."
+  },
+  "remaining_environment_limits": [
+    "Go is unavailable on PATH, so the updated Go regression tests could not run here.",
+    "Managed host ACL denies pytest's temporary fixture directories; direct focused tests and live SDK E2E passed."
+  ],
+  "supersedes": "RESULT_GOAL_AGENTFIELD.json"
+}

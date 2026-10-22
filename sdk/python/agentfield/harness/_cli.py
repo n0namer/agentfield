@@ -10,6 +10,9 @@ import re
 import shutil
 import signal
 import subprocess
+import tempfile
+import threading
+import time
 from collections import deque
 from typing import Any, Deque, Dict, List, Optional, Tuple
 
@@ -260,6 +263,110 @@ async def _wait_process_exit(
     return proc.returncode
 
 
+def _run_cli_sync_fallback(
+    cmd: List[str],
+    *,
+    env: Dict[str, str],
+    cwd: Optional[str],
+    timeout: Optional[float],
+    idle_seconds: Optional[float],
+    input_text: Optional[str],
+    cancel_event: Optional[threading.Event] = None,
+) -> Tuple[str, str, int]:
+    """Run direct argv synchronously when Windows overlapped pipes are denied.
+
+    Some managed Windows hosts deny the anonymous overlapped pipe handles used
+    by ``asyncio.create_subprocess_exec`` (WinError 5), while ordinary direct
+    ``subprocess.Popen`` pipes remain usable.  Keep the fallback shell-free and
+    preserve the same argv/environment/cwd contract; it is intentionally only
+    selected for that host-level permission failure.
+    """
+    def kill_tree(process: subprocess.Popen[bytes]) -> None:
+        if os.name == "nt" and process.pid:
+            try:
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                    capture_output=True,
+                    timeout=5,
+                    check=False,
+                )
+            except (OSError, subprocess.SubprocessError):
+                pass
+        try:
+            process.kill()
+        except (ProcessLookupError, OSError):
+            pass
+
+    def bounded_file(file_obj) -> str:
+        cap = _resolve_max_output_bytes()
+        size = os.fstat(file_obj.fileno()).st_size
+        if cap <= 0 or size <= cap:
+            file_obj.seek(0)
+            return file_obj.read().decode("utf-8", errors="replace")
+        chunks = _BoundedChunks(cap)
+        head_size = int(cap * _TRUNCATION_HEAD_FRACTION)
+        file_obj.seek(0)
+        chunks.append(file_obj.read(head_size))
+        file_obj.seek(max(0, size - (cap - head_size)))
+        chunks.append(file_obj.read(cap - head_size))
+        chunks.dropped_bytes = max(0, size - cap)
+        return chunks.joined().decode("utf-8", errors="replace")
+
+    temp_dir = env.get("AGENTFIELD_HARNESS_TEMP_DIR") or None
+    with (
+        tempfile.TemporaryFile(dir=temp_dir) as stdout_file,
+        tempfile.TemporaryFile(dir=temp_dir) as stderr_file,
+    ):
+        creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if os.name == "nt" else 0
+        process = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE if input_text is not None else subprocess.DEVNULL,
+            stdout=stdout_file,
+            stderr=stderr_file,
+            env=env,
+            cwd=cwd,
+            shell=False,
+            start_new_session=os.name != "nt",
+            creationflags=creationflags,
+        )
+        try:
+            if input_text is not None and process.stdin is not None:
+                try:
+                    process.stdin.write(input_text.encode("utf-8"))
+                    process.stdin.flush()
+                except (BrokenPipeError, OSError):
+                    pass
+                finally:
+                    process.stdin.close()
+            started = last_activity = time.monotonic()
+            last_size = 0
+            while process.poll() is None:
+                if cancel_event is not None and cancel_event.is_set():
+                    kill_tree(process)
+                    raise asyncio.CancelledError()
+                now = time.monotonic()
+                size = os.fstat(stdout_file.fileno()).st_size + os.fstat(stderr_file.fileno()).st_size
+                if size != last_size:
+                    last_size = size
+                    last_activity = now
+                if timeout is not None and now - started >= timeout:
+                    kill_tree(process)
+                    raise TimeoutError(f"CLI command timed out after {timeout}s: {' '.join(cmd)}")
+                if idle_seconds is not None and now - last_activity >= idle_seconds:
+                    kill_tree(process)
+                    raise TimeoutError(f"CLI command made no progress for {idle_seconds}s: {' '.join(cmd)}")
+                time.sleep(0.05)
+            returncode = process.wait(timeout=5)
+            return bounded_file(stdout_file), bounded_file(stderr_file), returncode
+        finally:
+            if process.poll() is None:
+                kill_tree(process)
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    pass
+
+
 async def run_cli(
     cmd: List[str],
     *,
@@ -299,18 +406,40 @@ async def run_cli(
 
     idle = _resolve_idle_seconds(idle_seconds)
 
-    proc = await asyncio.create_subprocess_exec(
-        resolve_cli_command(cmd[0]),
-        *cmd[1:],
-        stdin=asyncio.subprocess.PIPE
-        if input_text is not None
-        else asyncio.subprocess.DEVNULL,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        env=merged_env,
-        cwd=cwd,
-        start_new_session=True,
-    )
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            resolve_cli_command(cmd[0]),
+            *cmd[1:],
+            stdin=asyncio.subprocess.PIPE
+            if input_text is not None
+            else asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=merged_env,
+            cwd=cwd,
+            start_new_session=True,
+        )
+    except PermissionError as exc:
+        # Windows managed hosts can reject asyncio's overlapped pipe handles
+        # even though direct shell-free Popen pipes are permitted.  Do not
+        # route through .cmd/.ps1/cmd.exe; retry the exact argv directly.
+        if os.name != "nt" or getattr(exc, "winerror", None) != 5:
+            raise
+        cancelled = threading.Event()
+        fallback = asyncio.create_task(asyncio.to_thread(
+            _run_cli_sync_fallback, cmd, env=merged_env, cwd=cwd,
+            timeout=timeout, idle_seconds=idle, input_text=input_text,
+            cancel_event=cancelled,
+        ))
+        try:
+            return await fallback
+        except asyncio.CancelledError:
+            cancelled.set()
+            try:
+                await asyncio.shield(fallback)
+            except BaseException:
+                pass
+            raise
 
     max_output_bytes = _resolve_max_output_bytes()
     stdout_chunks = _BoundedChunks(max_output_bytes)

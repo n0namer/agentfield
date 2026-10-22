@@ -3899,14 +3899,16 @@ class Agent(FastAPI):
             schema: Pydantic BaseModel class for structured output validation.
             provider: Override provider ("aforge", "claude-code", "codex", "gemini",
                 "opencode", "grok", "pi", "omp"). Omit to use
-                ``AGENTFIELD_HARNESS_PROVIDER`` when set, otherwise ``aforge``.
+                ``AGENTFIELD_HARNESS_PROVIDER`` when set, otherwise ``codex``
+                on Windows or ``opencode`` elsewhere.
             model: Override model identifier. Empty uses the provider's own default.
             variant: Provider-specific reasoning-effort variant. Wins over a
                 ``#variant`` suffix on the model when supported by the provider.
             max_turns: Maximum agent iterations.
             max_budget_usd: Cost cap in USD.
             tools: Allowed tools list.
-            permission_mode: Permission mode ("plan", "auto", None).
+            permission_mode: Permission mode ("plan"/None for read-only,
+                "auto" for explicit workspace-write).
             system_prompt: System prompt for the agent.
             env: Environment variables for the agent.
             cwd: Working directory for the agent process. When ``project_dir`` is

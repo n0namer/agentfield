@@ -99,6 +99,37 @@ def build_prompt_suffix(schema: Any, cwd: str) -> str:
     )
 
 
+def build_stdout_prompt_suffix(schema: Any) -> str:
+    """Build a schema contract that never asks the agent to write files.
+
+    This is used for read-only Codex calls, where the model can return a
+    validated JSON object but must not be asked to create the usual output
+    file.  ``HarnessRunner`` already validates the provider's final text.
+    """
+    schema_json = json.dumps(schema_to_json_schema(schema), indent=2)
+    return (
+        "\n\n---\n"
+        "CRITICAL STRUCTURED OUTPUT REQUIREMENTS (read-only):\n"
+        "Return ONLY one valid JSON object matching the schema below.\n"
+        "Do not use tools, write files, add markdown fences, or include commentary.\n"
+        f"Required JSON Schema:\n{schema_json}\n"
+    )
+
+
+def build_stdout_followup_prompt(error_message: str, schema: Any) -> str:
+    """Build a file-free structured-output correction prompt.
+
+    Read-only providers cannot use the ordinary recovery path because it names
+    an output file (and, for large schemas, creates a schema file). Keep every
+    retry self-contained and constrained to its stdout response.
+    """
+    return (
+        "\n\nPREVIOUS STRUCTURED OUTPUT WAS INVALID. "
+        f"Validation error: {error_message}\n"
+        + build_stdout_prompt_suffix(schema)
+    )
+
+
 def write_schema_file(schema_json: str, cwd: str) -> str:
     """Write schema JSON to the schema file. Returns the file path."""
     path = get_schema_path(cwd)

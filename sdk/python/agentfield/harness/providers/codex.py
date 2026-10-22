@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import time
+import os
+import shutil
+import sys
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from agentfield.harness._cli import (
@@ -18,18 +22,96 @@ from agentfield.harness._availability import ensure_cli_available, provider_unav
 from agentfield.harness._result import FailureType, Metrics, RawResult
 
 
+def _find_codex_entrypoint(launcher: str) -> Optional[str]:
+    """Find npm's JavaScript entrypoint without executing its shell shim."""
+    resolved = shutil.which(launcher)
+    if not resolved and launcher.lower() != "codex":
+        resolved = shutil.which("codex")
+    if not resolved:
+        return None
+
+    shim = Path(resolved)
+    if shim.suffix.lower() == ".js" and shim.is_file():
+        return str(shim)
+    candidates = [
+        shim.parent / "node_modules" / "@openai" / "codex" / "bin" / "codex.js",
+    ]
+    # The old managed package location remains a compatibility fallback, but
+    # a normal npm installation is discovered from its shim first.
+    root = os.environ.get("CODEX_MANAGED_PACKAGE_ROOT")
+    if root:
+        candidates.append(Path(root) / "bin" / "codex.js")
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
 class CodexProvider:
     """Codex CLI provider. Invokes `codex exec --json` subprocess."""
 
     def __init__(self, bin_path: str = "codex"):
         self._bin = bin_path
 
+    @staticmethod
+    def _command_prefix(bin_path: str) -> list[str]:
+        """Return a shell-free argv prefix for the Codex JavaScript CLI.
+
+        Windows npm installs expose ``codex`` through ``.cmd``/``.ps1``
+        launchers.  Those require a shell and are unavailable to an async
+        CreateProcess call in restricted hosts.  Prefer the direct Node
+        executable plus the managed ``codex.js`` entrypoint instead.
+        """
+        if sys.platform != "win32":
+            return [bin_path]
+
+        candidate = Path(bin_path)
+        if candidate.suffix.lower() == ".js":
+            node = shutil.which("node")
+            entrypoint = (
+                str(candidate)
+                if "/" in bin_path or "\\" in bin_path
+                else shutil.which(bin_path)
+            )
+            if node and entrypoint:
+                return [node, entrypoint]
+            raise provider_unavailable("codex", "node")
+
+        # Preserve an explicit native executable path.  Only a bare command
+        # name or an npm shim is eligible for managed Node entrypoint lookup.
+        if ("/" in bin_path or "\\" in bin_path) and candidate.suffix.lower() not in {
+            ".cmd",
+            ".ps1",
+        }:
+            return [bin_path]
+
+        resolved = shutil.which(bin_path)
+        if resolved and Path(resolved).suffix.lower() == ".exe":
+            return [resolved]
+
+        entrypoint = _find_codex_entrypoint(bin_path)
+        node = shutil.which("node")
+        if entrypoint and node:
+            return [node, entrypoint]
+        # A bare executable may be native; preserve it rather than guessing a
+        # shell route. npm shims must never fall through to cmd.exe/powershell.
+        if candidate.suffix.lower() not in {".cmd", ".ps1"} and (
+            "/" in bin_path or "\\" in bin_path
+        ):
+            return [bin_path]
+        raise provider_unavailable("codex", "direct Codex entrypoint")
+
     async def execute(self, prompt: str, options: dict[str, object]) -> RawResult:
         ensure_cli_available("codex", self._bin)
         # --skip-git-repo-check lets the harness run in arbitrary working dirs
         # (temp dirs, non-repo project roots); codex exec otherwise refuses to
         # start outside a git repo.
-        cmd = [self._bin, "exec", "--json", "--skip-git-repo-check"]
+        cmd = self._command_prefix(self._bin) + [
+            "--no-daemon",
+            "exec",
+            "--json",
+            "--skip-git-repo-check",
+        ]
 
         # Agent root: project_dir is the canonical field, fall back to cwd. -C is
         # codex's single working-root flag (agentfield#686).
@@ -43,7 +125,10 @@ class CodexProvider:
         permission_mode = options.get("permission_mode")
         if permission_mode == "auto":
             cmd.extend(["--sandbox", "workspace-write"])
-        elif permission_mode == "plan":
+        else:
+            # The SDK's safe default is read-only.  A caller must opt into
+            # ``permission_mode="auto"`` before a Codex harness task can edit
+            # its workspace.  ``plan`` remains a readable compatibility alias.
             cmd.extend(["--sandbox", "read-only"])
 
         # Model via -m; reasoning effort has no dedicated flag — it's the

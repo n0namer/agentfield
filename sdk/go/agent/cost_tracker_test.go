@@ -301,7 +301,7 @@ func TestRecordHarnessUsage(t *testing.T) {
 		assert.Equal(t, "openrouter", entries[0]["provider"])
 	})
 
-	t.Run("provider defaults to aforge", func(t *testing.T) {
+	t.Run("provider defaults to the platform route", func(t *testing.T) {
 		t.Setenv(harness.ProviderEnvVar, "")
 		a := newAgentForTest(t)
 		tracker := NewCostTracker()
@@ -311,8 +311,9 @@ func TestRecordHarnessUsage(t *testing.T) {
 
 		entries := tracker.Serialize()["entries"].([]map[string]any)
 		require.Len(t, entries, 1)
-		assert.Equal(t, "aforge", entries[0]["harness"])
-		assert.Equal(t, "aforge", entries[0]["model"])
+		defaults := harness.ResolvePlatformDefaults(harness.Options{})
+		assert.Equal(t, defaults.Provider, entries[0]["harness"])
+		assert.Equal(t, defaults.Model, entries[0]["model"])
 	})
 
 	t.Run("provider falls back to environment", func(t *testing.T) {

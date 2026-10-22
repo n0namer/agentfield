@@ -3,11 +3,12 @@ package harness
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 )
 
 // ResolveProviderName applies harness provider precedence: an explicit name
-// wins, then AGENTFIELD_HARNESS_PROVIDER, then DefaultProvider ("aforge").
+// wins, then AGENTFIELD_HARNESS_PROVIDER, then the implicit platform route.
 // Blank / whitespace-only values are treated as unset.
 func ResolveProviderName(name string) string {
 	if trimmed := strings.TrimSpace(name); trimmed != "" {
@@ -16,7 +17,10 @@ func ResolveProviderName(name string) string {
 	if envName := strings.TrimSpace(os.Getenv(ProviderEnvVar)); envName != "" {
 		return envName
 	}
-	return DefaultProvider
+	if runtime.GOOS == "windows" {
+		return ProviderCodex
+	}
+	return ProviderOpenCode
 }
 
 // BuildProvider creates a Provider instance for the given provider name.

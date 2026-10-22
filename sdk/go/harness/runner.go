@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -47,6 +48,54 @@ type schemaAware interface {
 	SetSchema(schemaPath, outputPath string)
 }
 
+type executionContextKey struct{}
+type causalIDsContextKey struct{}
+
+type causalIDs struct {
+	executionID *string
+	runID       *string
+}
+
+// WithExecutionContext attaches AgentField causal identity to a harness
+// context. It is separate from provider session/thread identifiers.
+func WithExecutionContext(ctx context.Context, executionID, runID string) context.Context {
+	return context.WithValue(ctx, executionContextKey{}, map[string]string{
+		"execution_id": executionID,
+		"run_id": runID,
+	})
+}
+
+func causalIDsFromContext(ctx context.Context) (*string, *string) {
+	if ctx == nil {
+		return nil, nil
+	}
+	var executionID, runID string
+	if values, ok := ctx.Value(executionContextKey{}).(map[string]string); ok {
+		executionID, runID = values["execution_id"], values["run_id"]
+	}
+	var executionPtr, runPtr *string
+	if executionID != "" {
+		value := executionID
+		executionPtr = &value
+	}
+	if runID != "" {
+		value := runID
+		runPtr = &value
+	}
+	return executionPtr, runPtr
+}
+
+func applyCausalIDs(ctx context.Context, result *Result) *Result {
+	if ctx != nil {
+		if snapshot, ok := ctx.Value(causalIDsContextKey{}).(causalIDs); ok {
+			result.ExecutionID, result.RunID = snapshot.executionID, snapshot.runID
+			return result
+		}
+	}
+	result.ExecutionID, result.RunID = causalIDsFromContext(ctx)
+	return result
+}
+
 // Run dispatches a prompt to a coding agent and returns the result.
 // If schema is non-nil, the runner instructs the agent to write structured
 // JSON output and validates it, retrying on failure.
@@ -54,8 +103,12 @@ type schemaAware interface {
 // The schema parameter should be a JSON Schema as map[string]any. If dest
 // is non-nil, the validated output is unmarshalled into it.
 func (r *Runner) Run(ctx context.Context, prompt string, schema map[string]any, dest any, overrides Options) (*Result, error) {
-	opts := r.mergeOptions(overrides)
-	opts.Provider = ResolveProviderName(opts.Provider)
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	executionID, runID := causalIDsFromContext(ctx)
+	ctx = context.WithValue(ctx, causalIDsContextKey{}, causalIDs{executionID: executionID, runID: runID})
+	opts := resolveRunnerOptionsFor(runtime.GOOS, r.DefaultOptions, overrides)
 
 	provider, err := r.buildProvider(opts)
 	if err != nil {
@@ -158,7 +211,7 @@ func (r *Runner) Run(ctx context.Context, prompt string, schema map[string]any, 
 	if schema != nil {
 		result := r.handleSchemaWithRetry(ctx, raw, schema, dest, outputDir, startTime, provider, opts, effectivePrompt, useIncremental)
 		CleanupTempFiles(outputDir)
-		return result, nil
+		return applyCausalIDs(ctx, result), nil
 	}
 
 	elapsed := int(time.Since(startTime).Milliseconds())
@@ -175,7 +228,7 @@ func (r *Runner) Run(ctx context.Context, prompt string, schema map[string]any, 
 		Messages:     raw.Messages,
 	}
 	metricsTokens(raw.Metrics).applyTo(res)
-	return res, nil
+	return applyCausalIDs(ctx, res), nil
 }
 
 // metricsTokens lifts a single execution's Metrics token counts into a
@@ -433,7 +486,7 @@ func (r *Runner) handleSchemaWithRetry(
 			Messages:   msgs,
 		}
 		tok.applyTo(res)
-		return res
+		return applyCausalIDs(ctx, res)
 	}
 
 	// Check if the initial error is non-retryable
@@ -462,7 +515,7 @@ func (r *Runner) handleSchemaWithRetry(
 			Messages:     msgs,
 		}
 		tok.applyTo(res)
-		return res
+		return applyCausalIDs(ctx, res)
 	}
 
 	lastSessionID := initialRaw.Metrics.SessionID
@@ -483,7 +536,7 @@ func (r *Runner) handleSchemaWithRetry(
 				Messages:     msgs,
 			}
 			tok.applyTo(res)
-			return res
+			return applyCausalIDs(ctx, res)
 		}
 		if retryNum > 0 {
 			delay := math.Min(0.5*math.Pow(2, float64(retryNum-1)), 5.0)
@@ -506,7 +559,7 @@ func (r *Runner) handleSchemaWithRetry(
 					Messages:     msgs,
 				}
 				tok.applyTo(res)
-				return res
+				return applyCausalIDs(ctx, res)
 			}
 		}
 
@@ -589,7 +642,7 @@ func (r *Runner) handleSchemaWithRetry(
 				Messages:   msgs,
 			}
 			tok.applyTo(res)
-			return res
+			return applyCausalIDs(ctx, res)
 		}
 	}
 
@@ -612,7 +665,7 @@ func (r *Runner) handleSchemaWithRetry(
 		Messages:    msgs,
 	}
 	tok.applyTo(res)
-	return res
+	return applyCausalIDs(ctx, res)
 }
 
 // accumulateMetrics sums metrics across every provider execution that

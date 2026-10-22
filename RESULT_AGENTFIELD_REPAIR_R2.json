@@ -1,0 +1,12 @@
+{
+  "verdict": "WORKING",
+  "result_file": "RESULT_INTERACTIVE_LUNA_MEDIUM_AGENTFIELD.json",
+  "validated_repairs": [
+    "Read-only Codex structured output creates no AgentField output directory and retries via stdout-only prompts.",
+    "Bare Windows Codex shim resolution is direct node plus codex.js without CODEX_MANAGED_PACKAGE_ROOT; unresolved shims fail closed.",
+    "WinError 5 fallback is shell-free and has wall/idle timeout, cancellation, tree kill, bounded output, and scoped temporary handles.",
+    "Platform default assertions are no longer hardcoded to aforge."
+  ],
+  "live": "Plain, schema, and bare-launcher Luna/low calls completed successfully through the local endpoint.",
+  "limits": "Go unavailable; pytest tmp_path ACL blocked the broader suite; no live workspace-write artifact was created because it would exceed the exact writable scope."
+}

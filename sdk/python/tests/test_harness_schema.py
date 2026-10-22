@@ -8,6 +8,8 @@ from agentfield.harness._schema import (
     build_incremental_followup,
     build_incremental_prompt_suffix,
     build_prompt_suffix,
+    build_stdout_followup_prompt,
+    build_stdout_prompt_suffix,
     cleanup_temp_files,
     cosmetic_repair,
     diagnose_field_failures,
@@ -31,6 +33,24 @@ class TestSchema(BaseModel):
 class OptionalFieldSchema(BaseModel):
     name: str
     note: str = ""
+
+
+def test_stdout_schema_suffix_is_read_only_and_json_only():
+    suffix = build_stdout_prompt_suffix(TestSchema)
+
+    assert "Return ONLY one valid JSON object" in suffix
+    assert "use tools" in suffix
+    assert "Write tool" not in suffix
+    assert '"name"' in suffix
+
+
+def test_stdout_schema_followup_is_read_only_and_json_only():
+    suffix = build_stdout_followup_prompt("count is required", TestSchema)
+
+    assert "count is required" in suffix
+    assert "Return ONLY one valid JSON object" in suffix
+    assert "Write tool" not in suffix
+    assert ".agentfield_output.json" not in suffix
 
 
 def test_get_output_path_returns_deterministic_path(tmp_path):

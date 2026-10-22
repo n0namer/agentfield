@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 
@@ -9,17 +10,21 @@ import (
 )
 
 func TestResolveProviderName(t *testing.T) {
+	platformDefault := ProviderOpenCode
+	if runtime.GOOS == "windows" {
+		platformDefault = ProviderCodex
+	}
 	tests := []struct {
 		name     string
 		explicit string
 		env      string
 		want     string
 	}{
-		{name: "default", want: ProviderAforge},
+		{name: "default", want: platformDefault},
 		{name: "environment", env: ProviderCodex, want: ProviderCodex},
 		{name: "explicit wins", explicit: ProviderGemini, env: ProviderCodex, want: ProviderGemini},
-		{name: "blank explicit", explicit: "   ", want: ProviderAforge},
-		{name: "blank environment", env: "  ", want: ProviderAforge},
+		{name: "blank explicit", explicit: "   ", want: platformDefault},
+		{name: "blank environment", env: "  ", want: platformDefault},
 	}
 
 	for _, tt := range tests {
@@ -30,13 +35,16 @@ func TestResolveProviderName(t *testing.T) {
 	}
 }
 
-func TestBuildProvider_DefaultsToAforge(t *testing.T) {
+func TestBuildProvider_DefaultsToPlatformProvider(t *testing.T) {
 	t.Setenv(ProviderEnvVar, "")
 	provider, err := BuildProvider("", "")
 	require.NoError(t, err)
 	require.NotNil(t, provider)
-	_, ok := provider.(*AforgeProvider)
-	assert.True(t, ok)
+	if runtime.GOOS == "windows" {
+		assert.IsType(t, &CodexProvider{}, provider)
+	} else {
+		assert.IsType(t, &OpenCodeProvider{}, provider)
+	}
 }
 
 func TestBuildProvider_RejectsUnknownName(t *testing.T) {

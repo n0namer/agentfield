@@ -105,17 +105,19 @@ func (p *CodexProvider) Execute(ctx context.Context, prompt string, options Opti
 		cmd = append(cmd, "-c", "model_reasoning_effort="+variantValue)
 	}
 
-	// permission_mode → sandbox policy (port of codex_harness_patch.py:165-170).
-	// codex exec never prompts (approval policy is always Never); the sandbox
-	// controls what it may write. --full-auto is deprecated in favour of the
-	// bypass flag / --sandbox.
+	// permission_mode → sandbox policy. Codex exec never prompts (approval
+	// policy is always Never), so the sandbox is the actual write boundary.
+	// Keep the default read-only; callers must explicitly request "auto" to
+	// receive workspace-write.
 	switch options.PermissionMode {
 	case "auto":
-		cmd = append(cmd, "--dangerously-bypass-approvals-and-sandbox")
-	case "read-only", "workspace-write", "danger-full-access":
-		cmd = append(cmd, "--sandbox", options.PermissionMode)
-	default:
 		cmd = append(cmd, "--sandbox", "workspace-write")
+	case "workspace-write":
+		cmd = append(cmd, "--sandbox", "workspace-write")
+	case "danger-full-access":
+		cmd = append(cmd, "--sandbox", "danger-full-access")
+	default:
+		cmd = append(cmd, "--sandbox", "read-only")
 	}
 
 	// Native structured output: when the runner has set a schema, point codex at

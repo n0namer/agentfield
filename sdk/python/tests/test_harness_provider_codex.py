@@ -55,6 +55,77 @@ def test_extract_final_text_empty_events_returns_none() -> None:
     assert extract_final_text([]) is None
 
 
+@pytest.mark.parametrize("launcher", ["codex", "codex.cmd", "codex.ps1"])
+def test_codex_windows_launcher_resolves_bare_shims_without_managed_root(
+    monkeypatch: pytest.MonkeyPatch, launcher: str
+):
+    monkeypatch.setattr("agentfield.harness.providers.codex.sys.platform", "win32")
+    monkeypatch.setattr(
+        "agentfield.harness.providers.codex.shutil.which",
+        lambda name: r"C:\Program Files\nodejs\node.exe" if name == "node" else None,
+    )
+    monkeypatch.delenv("CODEX_MANAGED_PACKAGE_ROOT", raising=False)
+    monkeypatch.setattr(
+        "agentfield.harness.providers.codex._find_codex_entrypoint",
+        lambda _launcher: r"D:\npm\node_modules\@openai\codex\bin\codex.js",
+    )
+
+    command = CodexProvider._command_prefix(launcher)
+
+    assert command == [
+        r"C:\Program Files\nodejs\node.exe",
+        r"D:\npm\node_modules\@openai\codex\bin\codex.js",
+    ]
+
+
+def test_codex_windows_launcher_preserves_explicit_js_and_native(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr("agentfield.harness.providers.codex.sys.platform", "win32")
+    monkeypatch.setattr(
+        "agentfield.harness.providers.codex.shutil.which",
+        lambda name: "node.exe" if name == "node" else None,
+    )
+
+    assert CodexProvider._command_prefix(r"D:\pkg\codex.js") == [
+        "node.exe", r"D:\pkg\codex.js"
+    ]
+    assert CodexProvider._command_prefix(r"D:\bin\codex.exe") == [
+        r"D:\bin\codex.exe"
+    ]
+
+
+def test_codex_windows_launcher_resolves_bare_js_and_native_from_path(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr("agentfield.harness.providers.codex.sys.platform", "win32")
+    paths = {
+        "node": r"C:\node\node.exe",
+        "codex.js": r"D:\npm\node_modules\@openai\codex\bin\codex.js",
+        "codex.exe": r"D:\tools\codex.exe",
+    }
+    monkeypatch.setattr(
+        "agentfield.harness.providers.codex.shutil.which", lambda name: paths.get(name)
+    )
+
+    assert CodexProvider._command_prefix("codex.js") == [
+        r"C:\node\node.exe", paths["codex.js"]
+    ]
+    assert CodexProvider._command_prefix("codex.exe") == [paths["codex.exe"]]
+
+
+def test_codex_windows_unresolved_shim_fails_closed(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr("agentfield.harness.providers.codex.sys.platform", "win32")
+    monkeypatch.setattr("agentfield.harness.providers.codex.shutil.which", lambda _name: None)
+    monkeypatch.setattr(
+        "agentfield.harness.providers.codex._find_codex_entrypoint",
+        lambda _launcher: None,
+    )
+
+    with pytest.raises(HarnessProviderUnavailable, match="direct Codex entrypoint"):
+        CodexProvider._command_prefix("codex.cmd")
+
+
 def _fake_stream(chunks: list[bytes]):
     """Fake StreamReader: yield each chunk, then EOF (b"")."""
     from unittest.mock import AsyncMock, MagicMock
@@ -136,6 +207,30 @@ async def test_run_cli_timeout_kills_process(monkeypatch: pytest.MonkeyPatch):
 
 
 @pytest.mark.asyncio
+async def test_run_cli_falls_back_to_direct_popen_on_windows_pipe_acl(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """WinError 5 on asyncio pipes must not force a .cmd/.ps1 shell path."""
+    async def denied_spawn(*_args, **_kwargs):
+        error = PermissionError(5, "access denied")
+        error.winerror = 5  # type: ignore[attr-defined]
+        raise error
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", denied_spawn)
+    monkeypatch.setattr("agentfield.harness._cli.os.name", "nt")
+    monkeypatch.setattr(
+        "agentfield.harness._cli._run_cli_sync_fallback",
+        lambda *args, **kwargs: ("direct", "", 0),
+    )
+
+    assert await run_cli(["node", "--version"], input_text="probe") == (
+        "direct",
+        "",
+        0,
+    )
+
+
+@pytest.mark.asyncio
 async def test_codex_provider_constructs_command_and_maps_result(
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -165,6 +260,7 @@ async def test_codex_provider_constructs_command_and_maps_result(
 
     assert captured["cmd"] == [
         "/usr/local/bin/codex",
+        "--no-daemon",
         "exec",
         "--json",
         "--skip-git-repo-check",
@@ -296,6 +392,26 @@ async def test_codex_project_dir_is_root_and_plan_maps_to_read_only(
     assert "--full-auto" not in cmd
     assert "--skip-git-repo-check" in cmd
     assert captured["cwd"] == "/root"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("permission_mode", [None, "plan"])
+async def test_codex_default_and_plan_are_read_only(
+    monkeypatch: pytest.MonkeyPatch, permission_mode: str | None
+):
+    """Writes require an explicit ``auto`` opt-in from the caller."""
+    captured: dict[str, Any] = {}
+
+    async def fake_run_cli(cmd, *, env=None, cwd=None, timeout=None):
+        _ = (env, cwd, timeout)
+        captured["cmd"] = cmd
+        return '{"type":"turn.completed","text":"ok"}\n', "", 0
+
+    monkeypatch.setattr("agentfield.harness.providers.codex.run_cli", fake_run_cli)
+    await CodexProvider().execute("read this", {"permission_mode": permission_mode})
+
+    sandbox = captured["cmd"].index("--sandbox")
+    assert captured["cmd"][sandbox + 1] == "read-only"
 
 
 @pytest.mark.asyncio

@@ -1,0 +1,33 @@
+{
+  "goal": "Unblock public Python AgentField schema output while preserving the local Luna/low route.",
+  "verdict": "WORKING",
+  "scope": "Python AgentField harness boundary and its focused tests only; no PR/SWE/Deep/Ruflo infrastructure, secrets, commit, push, or deploy was changed.",
+  "repairs": [
+    "Read-only Codex schema execution has a dedicated stdout-only branch before any output-directory allocation. It neither creates nor cleans AgentField workspace files, and retries skip file parsing, diagnostics, AI repair, and Write/file prompt builders.",
+    "Windows command resolution now PATH-resolves bare codex.js and codex.exe, preserves explicit .js/native paths, resolves bare codex/codex.cmd/codex.ps1 through node plus the npm codex.js entrypoint, and fails closed for unresolved shims.",
+    "WinError 5 remains a shell-free direct-Popen fallback with process-tree termination, wall/idle timeout, cancellation cleanup, bounded returned capture, and context-managed temporary handles. Explicit auto remains the only Python workspace-write opt-in."
+  ],
+  "focused_tests": [
+    {
+      "command": "sdk/python/.venv/Scripts/python.exe -m pytest stdout schema tests + read-only retry filesystem guards + test_harness_provider_codex.py -q --disable-warnings -o addopts=''",
+      "result": "PASS: 27 passed"
+    },
+    {
+      "coverage": "Read-only retry regression replaces all filesystem entry points (mkdir, mkdtemp, cleanup, rmtree, output path, parse, diagnosis) with failures; the two-call stdout retry still parses successfully."
+    }
+  ],
+  "live_local_10110": {
+    "plain": {"result": "LUNA_SDK_PLAIN_OK", "session": "01a10ddc-8eb5-72c3-8085-5989773db881"},
+    "schema": {"parsed": {"greeting": "Luna", "number": 56}, "session": "01a10ddc-c1b8-73c3-9af2-162d82d434a2"},
+    "malformed_retry": {"is_error": false, "turns": 2, "parsed_result": {"greeting": "Luna", "number": 0}, "evidence": "The initial request required number to be omitted; the stdout-only correction retry returned a valid schema object."},
+    "launcher": "Bare codex with CODEX_MANAGED_PACKAGE_ROOT removed resolves directly to node.EXE plus npm codex.js; no shell shim is used."
+  },
+  "permission_contract": {
+    "plan_or_none": "read-only sandbox and stdout-only schema result/retries",
+    "auto": "workspace-write sandbox; no broader permission behavior changed"
+  },
+  "remaining_environment_limits": [
+    "The host's pytest temporary-directory ACL can block broad tmp_path suites; focused regressions and live calls pass.",
+    "Go is not on PATH; this R3 repair targeted Python as requested."
+  ]
+}

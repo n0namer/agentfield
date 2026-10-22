@@ -64,6 +64,10 @@ class HarnessResult:
     num_turns: int = 0
     duration_ms: int = 0
     session_id: str = ""
+    # AgentField causal identity for the invocation, when a current execution
+    # context exists. This is distinct from the provider session_id.
+    execution_id: Optional[str] = None
+    run_id: Optional[str] = None
     messages: List[Dict[str, Any]] = field(default_factory=list)
     # Token accounting aggregated across all provider attempts. Zero when the
     # provider does not report token counts.

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from agentfield.harness._defaults import resolve_harness_provider
+
 if TYPE_CHECKING:
     from agentfield.harness.providers._base import HarnessProvider
     from agentfield.types import HarnessConfig
@@ -19,7 +21,7 @@ SUPPORTED_PROVIDERS = {
 
 
 def build_provider(config: "HarnessConfig") -> "HarnessProvider":
-    provider_name = config.provider
+    provider_name = resolve_harness_provider(config.provider)
     if provider_name not in SUPPORTED_PROVIDERS:
         raise ValueError(
             f"Unknown harness provider: {provider_name!r}. Supported providers: "

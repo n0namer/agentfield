@@ -1,6 +1,11 @@
 package harness
 
-import "context"
+import (
+	"context"
+	"os"
+	"runtime"
+	"strings"
+)
 
 const (
 	// ProviderAforge is the provider name for the Aforge CLI.
@@ -22,15 +27,84 @@ const (
 )
 
 const (
-	// DefaultProvider is the harness provider used when no provider is
-	// configured explicitly and AGENTFIELD_HARNESS_PROVIDER is unset.
-	// AForge is AgentField's native coding harness.
+	// DefaultProvider is retained as the platform-independent fallback for
+	// callers that need a stable provider constant.
 	DefaultProvider = ProviderAforge
 
 	// ProviderEnvVar overrides the default provider process-wide. An
 	// explicitly configured provider still wins over it.
 	ProviderEnvVar = "AGENTFIELD_HARNESS_PROVIDER"
+	// ModelEnvVar and VariantEnvVar are the AgentField-prefixed harness
+	// overrides. The unprefixed aliases are also supported for compatibility
+	// with the harness CLI environment.
+	ModelEnvVar   = "AGENTFIELD_HARNESS_MODEL"
+	VariantEnvVar = "AGENTFIELD_HARNESS_VARIANT"
 )
+
+const (
+	DefaultWindowsModel   = "gpt-5.6-luna"
+	DefaultWindowsVariant = "low"
+	DefaultUnixModel      = "broker/fast-coding"
+	// Unix/FCM keeps its existing reasoning default; no variant is invented.
+	DefaultUnixVariant = ""
+)
+
+func platformDefaultsFor(goos string, options Options) Options {
+	explicitProvider := strings.TrimSpace(options.Provider) != ""
+	implicitPlatformRoute := !explicitProvider
+	if !explicitProvider {
+		if envProvider := strings.TrimSpace(os.Getenv(ProviderEnvVar)); envProvider != "" {
+			options.Provider = envProvider
+			implicitPlatformRoute = false
+		} else if goos == "windows" {
+			options.Provider = ProviderCodex
+		} else {
+			options.Provider = ProviderOpenCode
+		}
+	}
+
+	if strings.TrimSpace(options.Model) == "" {
+		options.Model = firstNonBlankEnv(ModelEnvVar, "HARNESS_MODEL")
+	}
+	if strings.TrimSpace(options.Variant) == "" {
+		options.Variant = firstNonBlankEnv(VariantEnvVar, "HARNESS_VARIANT")
+	}
+
+	if implicitPlatformRoute {
+		if strings.TrimSpace(options.Model) == "" {
+			if goos == "windows" {
+				options.Model = DefaultWindowsModel
+			} else {
+				options.Model = DefaultUnixModel
+			}
+		}
+		if strings.TrimSpace(options.Variant) == "" && goos == "windows" {
+			options.Variant = DefaultWindowsVariant
+		}
+	}
+	return options
+}
+
+func firstNonBlankEnv(names ...string) string {
+	for _, name := range names {
+		if value := strings.TrimSpace(os.Getenv(name)); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func resolveRunnerOptionsFor(goos string, defaults, overrides Options) Options {
+	runner := &Runner{DefaultOptions: defaults}
+	return platformDefaultsFor(goos, runner.mergeOptions(overrides))
+}
+
+// ResolvePlatformDefaults fills unset provider, model, and variant fields.
+// Platform defaults are reserved for the implicit platform route; explicit
+// provider selection only receives model/variant environment values.
+func ResolvePlatformDefaults(options Options) Options {
+	return platformDefaultsFor(runtime.GOOS, options)
+}
 
 // Provider is the interface that CLI-based harness providers implement.
 // Each provider knows how to invoke a specific coding agent (opencode,
@@ -44,8 +118,8 @@ type Provider interface {
 type Options struct {
 	// Provider name: "aforge", "opencode", "claude-code", "codex",
 	// "gemini", "pi", "omp", or "cursor". An explicit value wins over
-	// AGENTFIELD_HARNESS_PROVIDER; when both are empty, the provider
-	// defaults to "aforge".
+	// AGENTFIELD_HARNESS_PROVIDER; when both are empty, the provider follows
+	// the implicit platform route.
 	Provider string
 
 	// Model identifier passed to the coding agent. It may carry a

@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from unittest.mock import patch
 
 from agentfield.harness._result import Metrics, RawResult
+from agentfield.harness._defaults import resolve_harness_provider
 from agentfield.harness._runner import (
     HarnessRunner,
     _accumulate_metrics,
@@ -149,13 +150,13 @@ async def test_concurrent_runs_with_same_cwd_use_isolated_output_files(tmp_path)
         first, second = await asyncio.gather(
             runner.run(
                 "first request",
-                provider="codex",
+                provider="opencode",
                 schema=DemoSchema,
                 cwd=str(tmp_path),
             ),
             runner.run(
                 "second request",
-                provider="codex",
+                provider="opencode",
                 schema=DemoSchema,
                 cwd=str(tmp_path),
             ),
@@ -170,6 +171,48 @@ async def test_concurrent_runs_with_same_cwd_use_isolated_output_files(tmp_path)
     assert second.parsed == DemoSchema(name="second", count=2)
     assert list(tmp_path.glob(".agentfield-out-*")) == []
     assert not (tmp_path / ".agentfield_output.json").exists()
+
+
+@pytest.mark.asyncio
+async def test_read_only_codex_schema_never_creates_files_and_retries_stdout_only(
+    monkeypatch,
+):
+    """Read-only Codex structured output is stdout-only, including retries."""
+    prompts: list[str] = []
+
+    class StdoutOnlyProvider:
+        async def execute(self, prompt: str, options: dict) -> RawResult:
+            prompts.append(prompt)
+            return RawResult(result=("not json" if len(prompts) == 1 else '{"name":"ok","count":2}'))
+
+    def unexpected_filesystem_write(*_args, **_kwargs):
+        raise AssertionError("read-only Codex schema path attempted a filesystem write")
+
+    async def no_ai_repair(*_args, **_kwargs):
+        raise AssertionError("read-only Codex schema path must retry through stdout")
+
+    monkeypatch.setattr("agentfield.harness._runner.os.makedirs", unexpected_filesystem_write)
+    monkeypatch.setattr("agentfield.harness._runner.tempfile.mkdtemp", unexpected_filesystem_write)
+    monkeypatch.setattr("agentfield.harness._runner.cleanup_temp_files", unexpected_filesystem_write)
+    monkeypatch.setattr("agentfield.harness._runner.shutil.rmtree", unexpected_filesystem_write)
+    monkeypatch.setattr("agentfield.harness._runner.get_output_path", unexpected_filesystem_write)
+    monkeypatch.setattr("agentfield.harness._runner.parse_and_validate", unexpected_filesystem_write)
+    monkeypatch.setattr(
+        "agentfield.harness._runner.diagnose_output_failure", unexpected_filesystem_write
+    )
+    monkeypatch.setattr("agentfield.harness._runner._ai_schema_repair", no_ai_repair)
+    monkeypatch.setattr("agentfield.harness._runner.asyncio.sleep", lambda *_: None)
+
+    with patch("agentfield.harness._runner.build_provider", return_value=StdoutOnlyProvider()):
+        result = await HarnessRunner().run(
+            "return structured data", provider="codex", schema=DemoSchema,
+            cwd="read-only-workspace", schema_max_retries=1,
+        )
+
+    assert result.parsed == DemoSchema(name="ok", count=2)
+    assert len(prompts) == 2
+    assert all(".agentfield_output.json" not in prompt for prompt in prompts)
+    assert all("Write tool" not in prompt for prompt in prompts)
 
 
 def test_resolve_options_merges_config_and_overrides_per_call_wins():
@@ -265,7 +308,7 @@ async def test_run_with_schema_injects_prompt_suffix_and_parses_output(tmp_path)
 
 
 @pytest.mark.asyncio
-async def test_run_defaults_to_aforge_when_no_provider_set(tmp_path, monkeypatch):
+async def test_run_uses_platform_provider_when_no_provider_set(tmp_path, monkeypatch):
     monkeypatch.delenv("AGENTFIELD_HARNESS_PROVIDER", raising=False)
     runner = HarnessRunner()
     provider = MockProvider([RawResult(result="ok")])
@@ -278,7 +321,7 @@ async def test_run_defaults_to_aforge_when_no_provider_set(tmp_path, monkeypatch
     with patch("agentfield.harness._runner.build_provider", fake_build_provider):
         result = await runner.run("hello", cwd=str(tmp_path))
 
-    assert captured["provider"] == "aforge"
+    assert captured["provider"] == resolve_harness_provider()
     assert result.result == "ok"
 
 

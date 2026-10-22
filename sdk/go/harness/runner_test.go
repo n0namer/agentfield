@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -37,7 +38,7 @@ func TestRunner_Run_NoSchema(t *testing.T) {
 	runner := NewRunner(Options{Provider: "opencode"})
 
 	// We can't easily test with real providers, so test the merge/validation logic
-	t.Run("empty provider defaults to aforge", func(t *testing.T) {
+	t.Run("empty provider defaults to the platform provider", func(t *testing.T) {
 		t.Setenv(ProviderEnvVar, "")
 		r := NewRunner(Options{BinPath: filepath.Join(t.TempDir(), "missing-aforge")})
 		result, err := r.Run(context.Background(), "test", nil, nil, Options{})
@@ -54,6 +55,97 @@ func TestRunner_Run_NoSchema(t *testing.T) {
 		assert.Contains(t, err.Error(), "unknown harness provider")
 	})
 }
+
+func TestRunner_CausalIDsFollowExecutionContext(t *testing.T) {
+	ctx := WithExecutionContext(context.Background(), "exec-123", "run-456")
+	result := applyCausalIDs(ctx, &Result{SessionID: "provider-session"})
+
+	require.NotNil(t, result.ExecutionID)
+	require.NotNil(t, result.RunID)
+	assert.Equal(t, "exec-123", *result.ExecutionID)
+	assert.Equal(t, "run-456", *result.RunID)
+	assert.Equal(t, "provider-session", result.SessionID)
+}
+
+func TestRunner_CausalIDsIgnoreGenericContextKeys(t *testing.T) {
+	ctx := context.WithValue(context.Background(), "execution_id", "generic-exec")
+	ctx = context.WithValue(ctx, "run_id", "generic-run")
+	result := applyCausalIDs(ctx, &Result{SessionID: "provider-session"})
+
+	assert.Nil(t, result.ExecutionID)
+	assert.Nil(t, result.RunID)
+	assert.Equal(t, "provider-session", result.SessionID)
+}
+
+func TestRunner_CausalIDsClearWithoutContext(t *testing.T) {
+	result := applyCausalIDs(context.Background(), &Result{
+		ExecutionID: stringPtr("stale-exec"),
+		RunID:       stringPtr("stale-run"),
+		SessionID:   "provider-session",
+	})
+
+	assert.Nil(t, result.ExecutionID)
+	assert.Nil(t, result.RunID)
+	assert.Equal(t, "provider-session", result.SessionID)
+}
+
+func TestRunner_CausalIDsAreIsolatedAcrossConcurrentCalls(t *testing.T) {
+	t.Parallel()
+
+	type caseData struct {
+		executionID string
+		runID       string
+	}
+	cases := []caseData{
+		{executionID: "exec-a", runID: "run-a"},
+		{executionID: "exec-b", runID: "run-b"},
+		{executionID: "exec-c", runID: "run-c"},
+	}
+	results := make(chan *Result, len(cases))
+	var group sync.WaitGroup
+	for _, tc := range cases {
+		tc := tc
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			ctx := WithExecutionContext(context.Background(), tc.executionID, tc.runID)
+			results <- applyCausalIDs(ctx, &Result{SessionID: "provider-session"})
+		}()
+	}
+	group.Wait()
+	close(results)
+
+	seen := make(map[string]string, len(cases))
+	for result := range results {
+		require.NotNil(t, result.ExecutionID)
+		require.NotNil(t, result.RunID)
+		seen[*result.ExecutionID] = *result.RunID
+		assert.Equal(t, "provider-session", result.SessionID)
+	}
+	assert.Equal(t, map[string]string{
+		"exec-a": "run-a",
+		"exec-b": "run-b",
+		"exec-c": "run-c",
+	}, seen)
+}
+
+func TestRunner_CausalIDsStayStableWhenAmbientContextChangesDuringRetry(t *testing.T) {
+	initial := WithExecutionContext(context.Background(), "exec-before-retry", "run-before-retry")
+	executionID, runID := causalIDsFromContext(initial)
+	snapshot := causalIDs{executionID: executionID, runID: runID}
+
+	mutated := WithExecutionContext(context.Background(), "exec-during-retry", "run-during-retry")
+	mutated = context.WithValue(mutated, causalIDsContextKey{}, snapshot)
+	result := applyCausalIDs(mutated, &Result{SessionID: "retry-provider-session"})
+
+	require.NotNil(t, result.ExecutionID)
+	require.NotNil(t, result.RunID)
+	assert.Equal(t, "exec-before-retry", *result.ExecutionID)
+	assert.Equal(t, "run-before-retry", *result.RunID)
+	assert.Equal(t, "retry-provider-session", result.SessionID)
+}
+
+func stringPtr(value string) *string { return &value }
 
 func TestRunner_MergeOptions(t *testing.T) {
 	runner := NewRunner(Options{

@@ -79,6 +79,11 @@ type Result struct {
 	NumTurns   int
 	DurationMS int
 	SessionID  string
+	// ExecutionID and RunID identify the AgentField execution that invoked the
+	// harness. They are nullable because standalone harness callers may have no
+	// AgentField execution context. These are distinct from provider SessionID.
+	ExecutionID *string
+	RunID       *string
 	Messages   []map[string]any
 
 	// Token accounting aggregated across every provider execution that

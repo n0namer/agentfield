@@ -11,6 +11,7 @@ node_modules
 **/.turbo
 **/.next
 **/.DS_Store
+**/.agentfield-out-*
 control-plane/web/client/.vite
 control-plane/web/client/dist
 control-plane/web/client/node_modules

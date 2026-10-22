@@ -106,19 +106,18 @@ func TestCodexStrictJSONSchema(t *testing.T) {
 	assert.False(t, srcMutated, "input schema must not be mutated")
 }
 
-// TestCodexProvider_SandboxMapping asserts the permission_mode → sandbox flag
-// mapping from codex_harness_patch.py:165-170.
+// TestCodexProvider_SandboxMapping asserts that writes require explicit opt-in.
 func TestCodexProvider_SandboxMapping(t *testing.T) {
 	cases := []struct {
 		mode string
 		want []string
 	}{
-		{"auto", []string{"--dangerously-bypass-approvals-and-sandbox"}},
+		{"auto", []string{"--sandbox", "workspace-write"}},
 		{"read-only", []string{"--sandbox", "read-only"}},
 		{"workspace-write", []string{"--sandbox", "workspace-write"}},
 		{"danger-full-access", []string{"--sandbox", "danger-full-access"}},
-		{"", []string{"--sandbox", "workspace-write"}},
-		{"something-else", []string{"--sandbox", "workspace-write"}},
+		{"", []string{"--sandbox", "read-only"}},
+		{"something-else", []string{"--sandbox", "read-only"}},
 	}
 
 	for _, tc := range cases {

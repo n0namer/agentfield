@@ -1,0 +1,78 @@
+{
+  "goal": "Make the AgentField candidate usable on A55 for local Codex/OpenCodex runtime with gpt-5.6-luna low.",
+  "verdict": "BLOCKED",
+  "scope": "AgentField worktree only; no commit, push, or deploy performed.",
+  "implemented_contract": {
+    "platform_defaults": "Windows defaults resolve to provider=codex, model=gpt-5.6-luna, variant=low; explicit provider/model/variant and environment overrides retain precedence.",
+    "read_only": "Codex permission_mode=None and permission_mode=plan now always send --sandbox read-only.",
+    "workspace_write": "Codex permission_mode=auto now sends --sandbox workspace-write; it is the only ordinary write opt-in.",
+    "plain_calls": "Plain (no-schema) harness calls no longer create a per-run writable output directory.",
+    "schema_and_concurrency": "Existing isolated schema-output and retry paths remain covered by the focused harness tests, but their full pytest execution is host-blocked by pytest temporary-directory ACL failures."
+  },
+  "changed_files": [
+    ".dockerignore",
+    "sdk/go/harness/codex.go",
+    "sdk/go/harness/codex_test.go",
+    "sdk/go/harness/factory.go",
+    "sdk/go/harness/factory_test.go",
+    "sdk/go/harness/pi_test.go",
+    "sdk/go/harness/platform_defaults_test.go",
+    "sdk/go/harness/provider.go",
+    "sdk/go/harness/result.go",
+    "sdk/go/harness/runner.go",
+    "sdk/go/harness/runner_invariant_test.go",
+    "sdk/go/harness/runner_test.go",
+    "sdk/python/agentfield/agent.py",
+    "sdk/python/agentfield/harness/_defaults.py",
+    "sdk/python/agentfield/harness/_result.py",
+    "sdk/python/agentfield/harness/_runner.py",
+    "sdk/python/agentfield/harness/providers/_factory.py",
+    "sdk/python/agentfield/harness/providers/codex.py",
+    "sdk/python/agentfield/types.py",
+    "sdk/python/tests/test_harness_defaults.py",
+    "sdk/python/tests/test_harness_factory.py",
+    "sdk/python/tests/test_harness_functional.py",
+    "sdk/python/tests/test_harness_provider_codex.py"
+  ],
+  "commands_and_tests": [
+    {
+      "command": "sdk/python/.venv/Scripts/python.exe -m compileall -q agentfield",
+      "result": "PASS"
+    },
+    {
+      "command": "sdk/python/.venv/Scripts/python.exe -m pytest tests/test_harness_defaults.py -q --disable-warnings -k 'plain_read_only_run_does_not_create_schema_output_directory or agent_harness_forwards_explicit_luna_low_read_only_contract'",
+      "result": "PASS (2 passed)"
+    },
+    {
+      "command": "sdk/python/.venv/Scripts/python.exe -m pytest tests/test_harness_provider_codex.py -q --disable-warnings -k 'not run_cli_timeout_kills_process'",
+      "result": "PASS (16 passed)"
+    },
+    {
+      "command": "sdk/python/.venv/Scripts/python.exe -m pytest tests/test_harness_defaults.py tests/test_harness_factory.py tests/test_harness_runner.py tests/test_harness_schema.py tests/test_harness_provider_codex.py -q --disable-warnings",
+      "result": "BLOCKED by WinError 5 when pytest accesses its just-created tmp_path directory; product assertions needing tmp_path did not execute."
+    },
+    {
+      "command": "go test ./harness (from sdk/go)",
+      "result": "BLOCKED: Go executable is not installed or on PATH on this A55 session."
+    }
+  ],
+  "live_evidence": [
+    {
+      "attempt": "Agent.harness(provider='codex', model='gpt-5.6-luna', variant='low', permission_mode='plan')",
+      "result": "BLOCKED before Codex invocation: Python asyncio.create_subprocess_exec could not create its Windows pipe (WinError 5 Access denied)."
+    },
+    {
+      "attempt": "Direct codex exec --json --skip-git-repo-check --sandbox read-only -m gpt-5.6-luna -c model_reasoning_effort=low",
+      "result": "Codex started a thread but native routing could not connect to wss://api.openai.com/v1/responses (Windows error 10061)."
+    },
+    {
+      "attempt": "ocx status",
+      "result": "Proxy health endpoint is live, but status says 'Codex routing is native — the running proxy is unused'; service is stale/unhealthy and no validated Codex runtime is available."
+    }
+  ],
+  "remaining_blocker": "A55 runtime/provisioning: repair or explicitly configure the native Codex/OpenCodex transport and its outbound network access, and restore Windows child-process pipe plus pytest temporary-directory ACL access. These are host/runtime failures, not an AgentField semantic failure. Re-run the live SDK plain and schema calls after repair.",
+  "notes": [
+    "The worktree was already dirty at start; unrelated existing edits were preserved.",
+    "Temporary directories created by failed pytest attempts could not be removed because their ACLs deny access after creation."
+  ]
+}

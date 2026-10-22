@@ -8,15 +8,20 @@ import random
 import shutil
 import tempfile
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
-from agentfield.harness._defaults import resolve_harness_provider
+from agentfield.execution_context import get_current_context
+from agentfield.harness._defaults import (
+    resolve_harness_options,
+)
 from agentfield.harness._result import FailureType, HarnessResult, RawResult
 from agentfield.harness._schema import (
     build_followup_prompt,
     build_incremental_followup,
     build_incremental_prompt_suffix,
     build_prompt_suffix,
+    build_stdout_followup_prompt,
+    build_stdout_prompt_suffix,
     cleanup_temp_files,
     diagnose_field_failures,
     diagnose_output_failure,
@@ -243,6 +248,39 @@ def _token_result_kwargs(tokens: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+_CausalIDs = Tuple[Optional[str], Optional[str]]
+
+
+def _snapshot_causal_ids() -> _CausalIDs:
+    """Snapshot AgentField identity once; retries must not re-read ambient state."""
+    context = get_current_context()
+    if context is None:
+        return None, None
+    return context.execution_id or None, context.run_id or None
+
+
+def _apply_causal_ids(
+    result: HarnessResult, causal_ids: Optional[_CausalIDs] = None
+) -> HarnessResult:
+    """Attach the current AgentField execution identity to a harness result."""
+    if causal_ids is None:
+        causal_ids = _snapshot_causal_ids()
+    result.execution_id, result.run_id = causal_ids
+    return result
+
+
+def _causal_id_kwargs(
+    causal_ids: Optional[_CausalIDs] = None,
+) -> Dict[str, Optional[str]]:
+    """Return causal identity fields for constructing a harness result."""
+    if causal_ids is None:
+        causal_ids = _snapshot_causal_ids()
+    return {
+        "execution_id": causal_ids[0],
+        "run_id": causal_ids[1],
+    }
+
+
 class HarnessRunner:
     def __init__(self, config: Optional[Any] = None):
         self._config = config
@@ -265,6 +303,7 @@ class HarnessRunner:
         project_dir: Optional[str] = None,
         **kwargs: Any,
     ) -> HarnessResult:
+        causal_ids = _snapshot_causal_ids()
         overrides = {
             "provider": provider,
             "model": model,
@@ -280,9 +319,13 @@ class HarnessRunner:
             **kwargs,
         }
         options = _resolve_options(self._config, overrides)
+        options["_causal_ids"] = causal_ids
 
-        resolved_provider = resolve_harness_provider(options.get("provider"))
-        options["provider"] = resolved_provider
+        resolved_defaults = resolve_harness_options(
+            options.get("provider"), options.get("model"), options.get("variant")
+        )
+        options.update(resolved_defaults)
+        resolved_provider = resolved_defaults["provider"]
 
         resolved_cwd = str(options.get("cwd") or ".")
         provider_instance = self._build_provider(str(resolved_provider), options)
@@ -299,11 +342,23 @@ class HarnessRunner:
             base_dir = resolved_project_dir
         else:
             base_dir = resolved_cwd
-        os.makedirs(base_dir, exist_ok=True)
-        temp_output_dir: Optional[str] = tempfile.mkdtemp(
-            prefix=".agentfield-out-", dir=base_dir
+        # Plain harness calls do not need an output file.  In particular, do
+        # not create a writeable directory merely to service a read-only Codex
+        # request: that both leaves needless filesystem debris and weakens the
+        # useful guarantee that the default call is read-only.  Schema runs do
+        # need a private output location so concurrent calls cannot collide.
+        read_only_codex = (
+            schema is not None
+            and str(resolved_provider).lower() == "codex"
+            and str(options.get("permission_mode") or "plan").lower() != "auto"
         )
-        output_dir = temp_output_dir
+        options["_stdout_schema_only"] = read_only_codex
+        temp_output_dir: Optional[str] = None
+        output_dir = base_dir
+        if schema is not None and not read_only_codex:
+            os.makedirs(base_dir, exist_ok=True)
+            temp_output_dir = tempfile.mkdtemp(prefix=".agentfield-out-", dir=base_dir)
+            output_dir = temp_output_dir
 
         # schema_mode selects how the agent is asked to produce the output:
         #   "single"      — one Write of the whole object (default, cheapest)
@@ -315,11 +370,14 @@ class HarnessRunner:
 
         effective_prompt = prompt
         if schema is not None:
-            suffix = (
-                build_incremental_prompt_suffix(schema, output_dir)
-                if use_incremental
-                else build_prompt_suffix(schema, output_dir)
-            )
+            if read_only_codex:
+                suffix = build_stdout_prompt_suffix(schema)
+            else:
+                suffix = (
+                    build_incremental_prompt_suffix(schema, output_dir)
+                    if use_incremental
+                    else build_prompt_suffix(schema, output_dir)
+                )
             effective_prompt = prompt + suffix
         options["_original_prompt"] = effective_prompt
 
@@ -330,14 +388,14 @@ class HarnessRunner:
             )
 
             if schema is not None:
-                return await self._handle_schema_with_retry(
+                return _apply_causal_ids(await self._handle_schema_with_retry(
                     raw,
                     schema,
                     output_dir,
                     start_time,
                     provider_instance,
                     options,
-                )
+                ), causal_ids)
 
             elapsed = int((time.monotonic() - start_time) * 1000)
             _cost, _turns, _sid, _msgs, _tokens = _accumulate_metrics([raw])
@@ -352,10 +410,11 @@ class HarnessRunner:
                 duration_ms=elapsed,
                 session_id=raw.metrics.session_id,
                 messages=raw.messages,
+                **_causal_id_kwargs(causal_ids),
                 **_token_result_kwargs(_tokens),
             )
         finally:
-            if schema is not None:
+            if temp_output_dir is not None:
                 cleanup_temp_files(output_dir)
             if temp_output_dir is not None:
                 shutil.rmtree(temp_output_dir, ignore_errors=True)
@@ -435,6 +494,11 @@ class HarnessRunner:
         provider: HarnessProvider,
         options: Dict[str, Any],
     ) -> HarnessResult:
+        if options.get("_stdout_schema_only"):
+            return await self._handle_stdout_schema_with_retry(
+                initial_raw, schema, start_time, provider, options
+            )
+
         output_path = get_output_path(cwd)
         schema_max_retries = int(
             options.get("schema_max_retries", DEFAULT_SCHEMA_RETRIES)
@@ -486,6 +550,7 @@ class HarnessRunner:
                 duration_ms=elapsed,
                 session_id=sid,
                 messages=msgs,
+                **_causal_id_kwargs(options.get("_causal_ids")),
                 **_token_result_kwargs(tokens),
             )
 
@@ -516,6 +581,7 @@ class HarnessRunner:
                 duration_ms=elapsed,
                 session_id=sid,
                 messages=msgs,
+                **_causal_id_kwargs(options.get("_causal_ids")),
                 **_token_result_kwargs(tokens),
             )
 
@@ -606,6 +672,7 @@ class HarnessRunner:
                     duration_ms=elapsed,
                     session_id=sid,
                     messages=msgs,
+                    **_causal_id_kwargs(options.get("_causal_ids")),
                     **_token_result_kwargs(tokens),
                 )
 
@@ -626,5 +693,77 @@ class HarnessRunner:
             duration_ms=elapsed,
             session_id=sid,
             messages=msgs,
+            **_causal_id_kwargs(options.get("_causal_ids")),
+            **_token_result_kwargs(tokens),
+        )
+
+    async def _handle_stdout_schema_with_retry(
+        self,
+        initial_raw: RawResult,
+        schema: Any,
+        start_time: float,
+        provider: HarnessProvider,
+        options: Dict[str, Any],
+    ) -> HarnessResult:
+        """Validate and retry read-only structured output without filesystem state."""
+        schema_max_retries = int(
+            options.get("schema_max_retries", DEFAULT_SCHEMA_RETRIES)
+        )
+        all_raws: List[RawResult] = [initial_raw]
+        validated = try_parse_from_text(initial_raw.result or "", schema)
+        last_session_id = initial_raw.metrics.session_id
+
+        for retry_num in range(schema_max_retries):
+            if validated is not None:
+                break
+            if retry_num:
+                await asyncio.sleep(min(0.5 * (2 ** (retry_num - 1)), 5.0))
+            original = str(options.get("_original_prompt") or "")
+            followup = build_stdout_followup_prompt(
+                "Response was not valid JSON matching the required schema.", schema
+            )
+            retry_options = dict(options)
+            if last_session_id:
+                retry_options["resume_session_id"] = last_session_id
+            retry_raw = await self._execute_with_retry(
+                provider, (original + "\n\n" + followup) if original else followup,
+                retry_options,
+            )
+            all_raws.append(retry_raw)
+            if retry_raw.metrics.session_id:
+                last_session_id = retry_raw.metrics.session_id
+            validated = try_parse_from_text(retry_raw.result or "", schema)
+
+        elapsed = int((time.monotonic() - start_time) * 1000)
+        cost, turns, sid, msgs, tokens = _accumulate_metrics(all_raws)
+        if validated is not None:
+            return HarnessResult(
+                result=all_raws[-1].result,
+                parsed=validated,
+                is_error=False,
+                cost_usd=cost,
+                num_turns=turns,
+                duration_ms=elapsed,
+                session_id=sid,
+                messages=msgs,
+                **_causal_id_kwargs(options.get("_causal_ids")),
+                **_token_result_kwargs(tokens),
+            )
+        return HarnessResult(
+            result=all_raws[-1].result,
+            parsed=None,
+            is_error=True,
+            error_message=(
+                "Schema validation failed after "
+                f"{schema_max_retries} retry attempt(s); read-only Codex "
+                "accepts stdout JSON only."
+            ),
+            failure_type=FailureType.SCHEMA,
+            cost_usd=cost,
+            num_turns=turns,
+            duration_ms=elapsed,
+            session_id=sid,
+            messages=msgs,
+            **_causal_id_kwargs(options.get("_causal_ids")),
             **_token_result_kwargs(tokens),
         )

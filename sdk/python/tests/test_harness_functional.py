@@ -23,6 +23,7 @@ Run a single provider::
 
 from __future__ import annotations
 
+import asyncio
 import os
 import shutil
 import subprocess
@@ -31,8 +32,17 @@ import tempfile
 import pytest
 from pydantic import BaseModel
 
+from agentfield.execution_context import (
+    ExecutionContext,
+    reset_execution_context,
+    set_execution_context,
+)
 from agentfield.harness._result import HarnessResult  # noqa: F401
-from agentfield.harness._runner import HarnessRunner
+from agentfield.harness._runner import (
+    HarnessRunner,
+    _apply_causal_ids,
+    _snapshot_causal_ids,
+)
 from agentfield.types import HarnessConfig
 
 # ────────────────────────────────────────────────────────────────────────
@@ -105,6 +115,103 @@ def work_dir():
 
 # Module‐level markers — every test in this file is harness_live + asyncio
 pytestmark = [pytest.mark.harness_live, pytest.mark.asyncio]
+
+
+async def test_harness_result_carries_current_causal_ids() -> None:
+    """Harness result identity follows AgentField context, not provider session."""
+    context = ExecutionContext(
+        run_id="run-functional",
+        execution_id="exec-functional",
+        agent_instance=None,
+        reasoner_name="harness_test",
+    )
+    token = set_execution_context(context)
+    try:
+        result = _apply_causal_ids(HarnessResult(session_id="provider-session"))
+    finally:
+        reset_execution_context(token)
+
+    assert result.execution_id == "exec-functional"
+    assert result.run_id == "run-functional"
+    assert result.session_id == "provider-session"
+
+
+async def test_harness_result_clears_causal_ids_without_active_context() -> None:
+    result = _apply_causal_ids(
+        HarnessResult(
+            session_id="provider-session",
+            execution_id="stale-exec",
+            run_id="stale-run",
+        )
+    )
+
+    assert result.execution_id is None
+    assert result.run_id is None
+    assert result.session_id == "provider-session"
+
+
+async def test_harness_causal_ids_are_isolated_across_concurrent_calls() -> None:
+    async def invoke(execution_id: str, run_id: str) -> HarnessResult:
+        token = set_execution_context(
+            ExecutionContext(
+                run_id=run_id,
+                execution_id=execution_id,
+                agent_instance=None,
+                reasoner_name="harness_test",
+            )
+        )
+        try:
+            await asyncio.sleep(0)
+            return _apply_causal_ids(HarnessResult(session_id="provider-session"))
+        finally:
+            reset_execution_context(token)
+
+    results = await asyncio.gather(
+        invoke("exec-a", "run-a"),
+        invoke("exec-b", "run-b"),
+        invoke("exec-c", "run-c"),
+    )
+
+    assert {(result.execution_id, result.run_id) for result in results} == {
+        ("exec-a", "run-a"),
+        ("exec-b", "run-b"),
+        ("exec-c", "run-c"),
+    }
+    assert all(result.session_id == "provider-session" for result in results)
+
+
+async def test_harness_causal_ids_stay_stable_when_context_changes_during_retry() -> None:
+    initial_token = set_execution_context(
+        ExecutionContext(
+            run_id="run-before-retry",
+            execution_id="exec-before-retry",
+            agent_instance=None,
+            reasoner_name="harness_test",
+        )
+    )
+    try:
+        causal_ids = _snapshot_causal_ids()
+    finally:
+        reset_execution_context(initial_token)
+
+    retry_token = set_execution_context(
+        ExecutionContext(
+            run_id="run-during-retry",
+            execution_id="exec-during-retry",
+            agent_instance=None,
+            reasoner_name="harness_test",
+        )
+    )
+    try:
+        result = _apply_causal_ids(
+            HarnessResult(session_id="retry-provider-session"), causal_ids
+        )
+    finally:
+        reset_execution_context(retry_token)
+
+    assert result.execution_id == "exec-before-retry"
+    assert result.run_id == "run-before-retry"
+    assert result.session_id == "retry-provider-session"
 
 
 # ════════════════════════════════════════════════════════════════════════

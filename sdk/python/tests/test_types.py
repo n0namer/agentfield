@@ -493,9 +493,11 @@ class TestHarnessConfig:
         assert hc.tools == ["Bash"]
         assert hc.permission_mode == "auto"
 
-    def test_provider_defaults_to_aforge(self, monkeypatch):
+    def test_provider_defaults_to_platform_route(self, monkeypatch):
         monkeypatch.delenv("AGENTFIELD_HARNESS_PROVIDER", raising=False)
-        assert HarnessConfig().provider == "aforge"
+        from agentfield.harness._defaults import resolve_harness_provider
+
+        assert HarnessConfig().provider == resolve_harness_provider()
 
     def test_json_roundtrip(self):
         hc = HarnessConfig(provider="gemini", model="gemini-2.5-flash")

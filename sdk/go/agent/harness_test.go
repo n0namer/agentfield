@@ -41,7 +41,7 @@ func TestHarnessRunner_LazyInitialization(t *testing.T) {
 
 func TestHarnessRunner_DefaultOptions(t *testing.T) {
 	// Agent with no HarnessConfig — runner gets zero-value Options; the
-	// provider is resolved at dispatch time (explicit > env > "aforge").
+	// provider is resolved at dispatch time (explicit > env > platform route).
 	a := newTestAgentForHarness(t)
 
 	runner := a.HarnessRunner()
@@ -114,17 +114,17 @@ func TestHarnessRunner_ConcurrentAccess(t *testing.T) {
 }
 
 func TestHarness_ErrorWithoutProvider(t *testing.T) {
-	// With no provider configured, Harness() defaults to aforge and reaches
+	// With no provider configured, Harness() follows the platform route and reaches
 	// provider execution. A missing binary may fail, but provider resolution does not.
 	t.Setenv(harness.ProviderEnvVar, "")
 	a := newTestAgentForHarness(t)
 
-	missingAforge := filepath.Join(t.TempDir(), "missing-aforge")
-	result, err := a.Harness(context.Background(), "do something", nil, nil, harness.Options{BinPath: missingAforge})
+	missingBinary := filepath.Join(t.TempDir(), "missing-harness")
+	result, err := a.Harness(context.Background(), "do something", nil, nil, harness.Options{BinPath: missingBinary})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.True(t, result.IsError)
-	assert.Contains(t, result.ErrorMessage, "missing-aforge")
+	assert.Contains(t, result.ErrorMessage, "missing-harness")
 	assert.NotContains(t, result.ErrorMessage, "no harness provider specified")
 }
 

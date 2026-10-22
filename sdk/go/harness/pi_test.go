@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -363,12 +364,16 @@ func TestBuildProviderPiFamily(t *testing.T) {
 	assert.Equal(t, "*harness.PiProvider", fmt.Sprintf("%T", pi))
 	assert.Equal(t, "*harness.OMPProvider", fmt.Sprintf("%T", omp))
 
-	// Pi and OMP are additional providers: an empty name still resolves to the
-	// SDK default, aforge.
+	// Pi and OMP are additional providers: an empty name resolves to the
+	// platform default.
 	t.Setenv(ProviderEnvVar, "")
 	defaultProvider, err := BuildProvider("", "")
 	require.NoError(t, err)
-	assert.Equal(t, "*harness.AforgeProvider", fmt.Sprintf("%T", defaultProvider))
+	wantType := "*harness.OpenCodeProvider"
+	if runtime.GOOS == "windows" {
+		wantType = "*harness.CodexProvider"
+	}
+	assert.Equal(t, wantType, fmt.Sprintf("%T", defaultProvider))
 }
 
 func TestPiFamilyMissingBinaryIncludesInstallGuidance(t *testing.T) {
