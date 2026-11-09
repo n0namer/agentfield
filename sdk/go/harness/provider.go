@@ -128,6 +128,7 @@ type Options struct {
 	// OpenCode runs. Providers may observe durable completion markers here,
 	// but it is intentionally not part of the public Options contract.
 	schemaOutputDir string
+	schema          map[string]any
 }
 
 func (o Options) maxRetries() int {

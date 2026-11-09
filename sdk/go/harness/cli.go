@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"regexp"
@@ -51,6 +50,22 @@ type CLIResult struct {
 	Stdout     string
 	Stderr     string
 	ReturnCode int
+}
+
+type activityBufferWriter struct {
+	mu           *sync.Mutex
+	buf          *bytes.Buffer
+	lastActivity *time.Time
+}
+
+func (w activityBufferWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	n, err := w.buf.Write(p)
+	if n > 0 {
+		*w.lastActivity = time.Now()
+	}
+	return n, err
 }
 
 // RunCLI runs a CLI command with no standard input: the child sees an immediate
@@ -151,59 +166,25 @@ func runCLIWithStdin(ctx context.Context, cmd []string, env map[string]string, c
 		return nil
 	}
 
-	stdoutPipe, err := c.StdoutPipe()
-	if err != nil {
-		return nil, err
-	}
-	stderrPipe, err := c.StderrPipe()
-	if err != nil {
-		return nil, err
-	}
-
-	if err := c.Start(); err != nil {
-		if isExecNotFound(err) {
-			return nil, err
-		}
-		return nil, err
-	}
-
 	var (
 		mu           sync.Mutex
 		stdout       bytes.Buffer
 		stderr       bytes.Buffer
 		lastActivity = time.Now()
-		wg           sync.WaitGroup
 	)
+	c.Stdout = activityBufferWriter{mu: &mu, buf: &stdout, lastActivity: &lastActivity}
+	c.Stderr = activityBufferWriter{mu: &mu, buf: &stderr, lastActivity: &lastActivity}
+	c.WaitDelay = 2 * time.Second
 
-	// Drain both pipes concurrently to avoid a pipe-buffer deadlock: if we
-	// read stdout fully before stderr, a child that fills the stderr pipe
-	// blocks forever.
-	drain := func(r io.Reader, buf *bytes.Buffer) {
-		defer wg.Done()
-		chunk := make([]byte, 65536)
-		for {
-			n, readErr := r.Read(chunk)
-			if n > 0 {
-				mu.Lock()
-				buf.Write(chunk[:n])
-				lastActivity = time.Now()
-				mu.Unlock()
-			}
-			if readErr != nil {
-				return
-			}
-		}
+	if err := c.Start(); err != nil {
+		return nil, err
 	}
-	wg.Add(2)
-	go drain(stdoutPipe, &stdout)
-	go drain(stderrPipe, &stderr)
 
-	// Wait for the child to exit on a separate goroutine so the watchdog
-	// loop below can observe idle stalls and abort early.
 	waitDone := make(chan error, 1)
 	go func() {
-		wg.Wait() // ensure all output is flushed before reaping
-		waitDone <- c.Wait()
+		waitErr := c.Wait()
+		killProcessGroup(c)
+		waitDone <- waitErr
 	}()
 
 	idleSeconds := resolveIdleSeconds()

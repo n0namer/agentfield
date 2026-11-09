@@ -171,6 +171,16 @@ func TestParseAndValidate(t *testing.T) {
 		assert.NotNil(t, data)
 		assert.Equal(t, "test", dest.Name)
 	})
+
+	t.Run("valid object with trailing garbage", func(t *testing.T) {
+		err := os.WriteFile(path, []byte("{\"name\":\"test\",\"severity\":\"low\"}\n}"), 0o644)
+		require.NoError(t, err)
+		var dest TestStruct
+		data, err := ParseAndValidate(path, &dest)
+		assert.NoError(t, err)
+		assert.Equal(t, "test", data["name"])
+		assert.Equal(t, "low", dest.Severity)
+	})
 }
 
 func TestTryParseFromText(t *testing.T) {

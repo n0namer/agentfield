@@ -329,3 +329,68 @@ func TestOpenCodeProvider_ModelVariantFlagWiring(t *testing.T) {
 		})
 	}
 }
+
+func TestWatchStableCompleteSchemaOutput_SchemaValidWithoutComplete(t *testing.T) {
+	dir := t.TempDir()
+	schema := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"approved": map[string]any{"type": "boolean"},
+		},
+		"required": []any{"approved"},
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	completed := make(chan struct{}, 1)
+	go watchStableCompleteSchemaOutput(ctx, dir, schema, cancel, completed)
+
+	if err := os.WriteFile(OutputPath(dir), []byte(`{}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-completed:
+		t.Fatal("incomplete schema output must not complete")
+	case <-time.After(350 * time.Millisecond):
+	}
+
+	if err := os.WriteFile(OutputPath(dir), []byte(`{"approved":false}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-completed:
+	case <-time.After(2 * time.Second):
+		t.Fatal("stable schema-valid output did not complete")
+	}
+}
+
+func TestWatchStableCompleteSchemaOutput_PreservesCompleteMarkerContract(t *testing.T) {
+	dir := t.TempDir()
+	schema := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"complete": map[string]any{"type": "boolean"},
+		},
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	completed := make(chan struct{}, 1)
+	go watchStableCompleteSchemaOutput(ctx, dir, schema, cancel, completed)
+
+	if err := os.WriteFile(OutputPath(dir), []byte(`{"complete":false}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-completed:
+		t.Fatal("complete=false must not complete")
+	case <-time.After(350 * time.Millisecond):
+	}
+
+	if err := os.WriteFile(OutputPath(dir), []byte(`{"complete":true}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-completed:
+	case <-time.After(2 * time.Second):
+		t.Fatal("stable complete=true output did not complete")
+	}
+}
